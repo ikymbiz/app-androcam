@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>スマホ監視カメラ</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body { margin: 0; background-color: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; font-family: sans-serif; color: white; }
+        button { padding: 15px 24px; font-size: 18px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; width: 100%; max-width: 300px; margin: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);}
+        .btn-camera { background-color: #dc3545; color: white; } 
+        .btn-viewer { background-color: #007bff; color: white; } 
+        .btn-connect { background-color: #28a745; color: white; } 
+        .btn-energy { background-color: #444; color: #ffeb3b; border: 1px solid #ffeb3b; margin-top: 15px;}
+        button:disabled { background-color: #666; cursor: not-allowed; box-shadow: none;}
+        #selection-screen { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        #camera-screen { display: none; flex-direction: column; align-items: center; width: 100%; z-index: 1; }
+        #viewer-screen { display: none; flex-direction: column; align-items: center; width: 100%; z-index: 1; }
+        #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;}
+        #qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; display: none; }
+        #viewer-id-display { font-size: 16px; color: #0f0; margin: 5px 0; word-break: break-all; }
+        #viewer-pin-display { font-size: 22px; color: #ffeb3b; font-weight: bold; margin: 5px 0; letter-spacing: 2px;}
+        #camera-controls { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; }
+        #reader { width: 100%; margin-bottom: 20px; background: #000; }
+        input[type="text"] { padding: 12px; font-size: 16px; width: calc(100% - 24px); margin-bottom: 10px; border-radius: 4px; border: none; text-align: center; }
+        #camera-streaming-view { display: none; flex-direction: column; align-items: center; width: 100%; }
+        #my-video { width: 100%; max-width: 400px; border: 2px solid #555; }
+        #remote-video { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; z-index: 10; }
+        #btn-record { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 20; background-color: #dc3545; width: auto; padding: 12px 30px; border-radius: 30px;}
+        #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
+    </style>
+</head>
+<body>
+    <div id="black-overlay"></div>
+    <div id="selection-screen">
+        <h2>監視カメラ Pro</h2>
+        <p>このデバイスの役割を選んでください</p>
+        <button id="btn-select-camera" class="btn-camera">📹 カメラとして使う</button>
+        <button id="btn-select-viewer" class="btn-viewer">📱 映像を見る</button>
+    </div>
+
+    <div id="camera-screen">
+        <div id="camera-controls">
+            <div id="reader"></div>
+            <p style="font-size: 14px; color: #aaa;">または手動入力</p>
+            <input type="text" id="target-id-input" placeholder="視聴側のIDを入力">
+            <input type="text" id="target-pw-input" placeholder="パスワード(PIN)を入力">
+            <button id="btn-connect" class="btn-connect">接続して配信開始</button>
+            <div id="camera-status-msg"></div>
+        </div>
+        <div id="camera-streaming-view">
+            <h3 style="color: #0f0;">配信中...</h3>
+            <button id="btn-energy-save" class="btn-energy">🌙 画面を消灯する</button>
+            <video id="my-video" autoplay muted playsinline></video>
+        </div>
+    </div>
+
+    <div id="viewer-screen">
+        <div id="info-box">
+            <div>カメラ用のスマホでQRを読み込んでください</div>
+            <div id="qrcode"></div>
+            <div id="viewer-id-display">ID取得中...</div>
+            <div id="viewer-pin-display">PIN生成中...</div>
+            <div id="viewer-status" style="color: #aaa; font-size: 14px; margin-top: 10px;">カメラからの接続を待っています...</div>
+        </div>
+        <video id="remote-video" autoplay playsinline></video>
+        <button id="btn-record">🔴 録画開始</button>
+    </div>
+
+    <script>
+        let peer;
+
+        document.getElementById('btn-select-camera').addEventListener('click', startCameraMode);
+        document.getElementById('btn-select-viewer').addEventListener('click', startViewerMode);
+
+        function startViewerMode() {
+            document.getElementById('selection-screen').style.display = 'none';
+            document.getElementById('viewer-screen').style.display = 'flex';
+
+            peer = new Peer();
+            const viewerPin = Math.floor(1000 + Math.random() * 9000).toString();
+
+            const videoEl = document.getElementById('remote-video');
+            const infoBox = document.getElementById('info-box');
+            const viewerStatus = document.getElementById('viewer-status');
+            const recordBtn = document.getElementById('btn-record');
+            let mediaRecorder;
+            let recordedChunks = [];
+
+            peer.on('open', (id) => {
+                document.getElementById('viewer-id-display').textContent = "ID: " + id;
+                document.getElementById('viewer-pin-display').textContent = "PIN: " + viewerPin;
+                
+                const qrData = id + '|' + viewerPin;
+                const qrcodeEl = document.getElementById('qrcode');
+                qrcodeEl.style.display = 'block';
+                new QRCode(qrcodeEl, { text: qrData, width: 160, height: 160 });
+            });
+
+            peer.on('call', (call) => {
+                if (call.metadata && call.metadata.password === viewerPin) {
+                    viewerStatus.textContent = 'カメラが接続しました！';
+                    viewerStatus.style.color = '#0f0';
+                    call.answer(); 
+
+                    call.on('stream', (remoteStream) => {
+                        infoBox.style.display = 'none';
+                        videoEl.style.display = 'block'; 
+                        videoEl.srcObject = remoteStream;
+                        recordBtn.style.display = 'block';
+
+                        recordBtn.addEventListener('click', (e) => {
+                            e.stopPropagation(); 
+                            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                                mediaRecorder.stop();
+                                recordBtn.textContent = '🔴 録画開始';
+                                recordBtn.style.backgroundColor = '#dc3545';
+                            } else {
+                                recordedChunks = [];
+                                mediaRecorder = new MediaRecorder(remoteStream);
+                                mediaRecorder.ondataavailable = (e) => {
+                                    if (e.data.size > 0) recordedChunks.push(e.data);
+                                };
+                                mediaRecorder.onstop = () => {
+                                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.style.display = 'none';
+                                    a.href = url;
+                                    a.download = 'camera_record.webm'; 
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                };
+                                mediaRecorder.start();
+                                recordBtn.textContent = '⏹ 録画停止';
+                                recordBtn.style.backgroundColor = '#6c757d';
+                            }
+                        });
+                    });
+                } else {
+                    call.close();
+                }
+            });
+
+            videoEl.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    if (videoEl.requestFullscreen) videoEl.requestFullscreen();
+                    else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                }
+            });
+        }
+
+        function startCameraMode() {
+            document.getElementById('selection-screen').style.display = 'none';
+            document.getElementById('camera-screen').style.display = 'flex';
+
+            peer = new Peer();
+
+            const connectBtn = document.getElementById('btn-connect');
+            const targetIdInput = document.getElementById('target-id-input');
+            const targetPwInput = document.getElementById('target-pw-input');
+            const cameraControls = document.getElementById('camera-controls');
+            const streamingView = document.getElementById('camera-streaming-view');
+            const statusMsg = document.getElementById('camera-status-msg');
+
+            function connectToViewer(targetId, targetPw) {
+                statusMsg.textContent = 'カメラを準備中...';
+                connectBtn.disabled = true;
+
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true })
+                    .then((stream) => {
+                        document.getElementById('my-video').srcObject = stream;
+                        statusMsg.textContent = '接続しています...';
+                        
+                        const call = peer.call(targetId, stream, { metadata: { password: targetPw } });
+
+                        cameraControls.style.display = 'none';
+                        streamingView.style.display = 'flex';
+
+                        call.on('error', (err) => {
+                            alert('接続に失敗しました。');
+                            location.reload();
+                        });
+                    })
+                    .catch((err) => {
+                        alert('カメラ・マイクにアクセスできませんでした。許可されているか確認してください。');
+                        connectBtn.disabled = false;
+                        statusMsg.textContent = '';
+                    });
+            }
+
+            connectBtn.addEventListener('click', () => {
+                const targetId = targetIdInput.value.trim();
+                const targetPw = targetPwInput.value.trim();
+                if (targetId && targetPw) connectToViewer(targetId, targetPw);
+                else alert("IDとパスワード(PIN)の両方を入力してください");
+            });
+
+            const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 200, height: 200} }, false);
+            html5QrcodeScanner.render((decodedText) => {
+                html5QrcodeScanner.clear().then(() => {
+                    const parts = decodedText.split('|');
+                    if (parts.length === 2) {
+                        targetIdInput.value = parts[0];
+                        targetPwInput.value = parts[1];
+                        connectToViewer(parts[0], parts[1]);
+                    } else {
+                        alert('無効なQRコードです');
+                        location.reload();
+                    }
+                });
+            }, (error) => {});
+
+            const overlay = document.getElementById('black-overlay');
+            document.getElementById('btn-energy-save').addEventListener('click', () => { 
+                overlay.style.display = 'block'; 
+            });
+        }
+    </script>
+</body>
+</html>
