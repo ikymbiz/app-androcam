@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>リモートカメラビューアー</title>
+    
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -39,14 +39,14 @@
         #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
         
         /* 接続待機状態 */
-        #viewer-waiting-state { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; gap: 30px; padding: 20px; box-sizing: border-box; }
-        .viewer-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px; max-width: 400px; width: 100%; background: rgba(255,255,255,0.05); padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
+        #viewer-waiting-state { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; gap: 20px; padding: 20px; box-sizing: border-box; }
+        .viewer-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 15px; max-width: 400px; width: 90%; background: rgba(255,255,255,0.05); padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
         .guide-text { font-size: 15px; line-height: 1.6; text-align: center; color: #eee; margin: 0; font-weight: bold;}
-        #viewer-qrcode-container { padding: 20px; background-color: #fff; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);}
+        #viewer-qrcode-container { padding: 15px; background-color: #fff; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);}
         #viewer-qrcode canvas { display: block; }
         #viewer-status { font-size: 14px; color: #00d26a; font-weight: bold; margin: 0; letter-spacing: 1px;}
         .viewer-link-section { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 8px 10px 8px 15px; border-radius: 30px; width: 100%; border: 1px solid rgba(255,255,255,0.1);}
-        #viewer-link-display { font-size: 13px; color: #ccc; word-break: break-all; text-align: left; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-right: 10px; }
+        #viewer-link-display { font-size: 13px; color: #ccc; word-break: break-all; text-align: left; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-right: 10px; flex-grow: 1; }
         
         /* 映像視聴状態 */
         #viewer-watching-state { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative; }
@@ -74,11 +74,14 @@
         #youtube-container { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 5; }
         #youtube-player { width: 100%; height: 100%; pointer-events: none; } /* iframeでの直接タップを防ぐ */
         
-        /* YouTube 操作用 UI */
+        /* YouTube / カメラ操作用 UI */
         .yt-controls { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 40px; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);}
         .yt-controls.show { opacity: 1; pointer-events: auto; }
         .yt-btn { background: rgba(255,255,255,0.15); border: none; color: white; font-size: 20px; cursor: pointer; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
         .yt-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
+
+        #camera-controls-overlay { position: fixed; bottom: 20px; left: 20px; z-index: 1000; display: none; }
+        #btn-toggle-camera { background: rgba(0, 0, 0, 0.6); }
 
         #my-video { display: none; }
 
@@ -114,6 +117,11 @@
             <button id="yt-play-pause" class="yt-btn">⏸</button>
             <button id="yt-mute-unmute" class="yt-btn">🔇</button>
         </div>
+    </div>
+
+    <!-- カメラ側: カメラ切り替え操作 -->
+    <div id="camera-controls-overlay">
+        <button id="btn-toggle-camera" class="icon-button">🔄</button>
     </div>
 
     <!-- ニュースサイトモック (カメラ通常時) -->
@@ -259,7 +267,12 @@
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
+        // WebRTC・カメラ制御用変数
         let peer;
+        let peerCall;
+        let localStream;
+        let currentFacingMode = 'environment';
+        
         let currentMode = 'initial'; 
         let currentConnectionLink = '';
         let isForceBlackout = false;
@@ -289,7 +302,8 @@
                     'playsinline': 1,
                     'loop': 1,
                     'playlist': videoId,
-                    'rel': 0
+                    'rel': 0,
+                    'enablejsapi': 1
                 },
                 events: {
                     'onReady': (event) => {
@@ -302,7 +316,7 @@
         // UIイベント: YouTube操作
         document.getElementById('yt-play-pause').addEventListener('click', (e) => {
             e.stopPropagation();
-            if(!ytPlayer) return;
+            if(!ytPlayer || typeof ytPlayer.pauseVideo !== 'function') return;
             if (isYtPlaying) {
                 ytPlayer.pauseVideo();
                 document.getElementById('yt-play-pause').textContent = '▶️';
@@ -315,7 +329,7 @@
 
         document.getElementById('yt-mute-unmute').addEventListener('click', (e) => {
             e.stopPropagation();
-            if(!ytPlayer) return;
+            if(!ytPlayer || typeof ytPlayer.unMute !== 'function') return;
             if (isYtMuted) {
                 ytPlayer.unMute();
                 document.getElementById('yt-mute-unmute').textContent = '🔊';
@@ -402,7 +416,7 @@
                         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
                     }
                 } else if (isForceBlackout) {
-                    // YouTubeURL未設定 かつ ブラックアウト有効
+                    // YouTubeURL未設定 かつ ブラックアウト有効 (何も表示させない)
                     newsContainer.style.display = 'none';
                     ytContainer.style.display = 'none';
                     blackoutOverlay.style.display = 'block';
@@ -430,8 +444,8 @@
         // ダブルクリックでブラックアウト(任意トグル)
         let clickCount = 0; let clickTimer;
         document.body.addEventListener('click', (e) => {
-            // モーダルや設定ボタン、YouTubeコンテナクリック時は除外
-            if (currentMode !== 'camera' || e.target.closest('#settings-modal') || e.target.closest('#btn-settings-open') || e.target.closest('#youtube-container')) return;
+            // モーダルや設定ボタン、YouTube/カメラ操作UIクリック時は除外
+            if (currentMode !== 'camera' || e.target.closest('#settings-modal') || e.target.closest('#btn-settings-open') || e.target.closest('#youtube-container') || e.target.closest('#camera-controls-overlay')) return;
             
             // 強制ブラックアウト状態(YouTube未設定＋ブラックアウト設定)の場合はトグルを無効化
             if (isForceBlackout && !document.getElementById('youtube-container').style.display.includes('block')) return;
@@ -572,18 +586,62 @@
             const guide = document.getElementById('swipe-guide');
             if(guide) guide.style.display = 'none';
 
-            peer = new Peer();
+            // カメラ切り替えボタンを表示
+            document.getElementById('camera-controls-overlay').style.display = 'block';
 
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true })
-                .then((stream) => {
-                    document.getElementById('my-video').srcObject = stream;
-                    const call = peer.call(targetId, stream, { metadata: { password: targetPw } });
-                    call.on('error', (err) => console.error('接続エラー:', err));
-                })
-                .catch((err) => {
-                    alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザの権限を確認してください。');
-                });
+            peer = new Peer();
+            
+            // カメラストリームの取得と接続開始
+            getCameraStreamAndConnect(targetId, targetPw, currentFacingMode);
         }
+
+        async function getCameraStreamAndConnect(targetId, targetPw, facingMode) {
+            try {
+                // 古いストリームがあれば停止
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                }
+
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: facingMode }, 
+                    audio: true 
+                });
+
+                document.getElementById('my-video').srcObject = localStream; 
+
+                // 既存の接続がある場合はトラックを置き換える
+                if (peerCall && peerCall.peerConnection) {
+                    const senders = peerCall.peerConnection.getSenders();
+                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                    if (videoSender) {
+                        const newVideoTrack = localStream.getVideoTracks()[0];
+                        await videoSender.replaceTrack(newVideoTrack);
+                        showToast(`カメラを${facingMode === 'user' ? '前面' : '背面'}に切り替えました`);
+                    }
+                } else {
+                    // 初回接続
+                    peerCall = peer.call(targetId, localStream, { metadata: { password: targetPw } });
+                    peerCall.on('error', (err) => console.error('接続エラー:', err));
+                }
+
+                currentFacingMode = facingMode; 
+            } catch (err) {
+                console.error('カメラ・マイクのアクセスエラー:', err);
+                alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザの権限を確認してください。');
+                document.getElementById('camera-controls-overlay').style.display = 'none'; 
+            }
+        }
+
+        // カメラ切り替えイベント
+        document.getElementById('btn-toggle-camera').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+            if (peerCall) {
+                getCameraStreamAndConnect(peerCall.peer, peerCall.metadata.password, newFacingMode);
+            } else {
+                showToast('カメラ接続の準備中です');
+            }
+        });
     </script>
 </body>
 </html>
