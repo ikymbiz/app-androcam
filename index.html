@@ -33,6 +33,9 @@
 
         /* 初回案内のオーバーレイ */
         #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 8px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6;}
+
+        /* ビューアー画面 (全画面) */
+        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
         
         /* ビューアーUI */
         #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
@@ -282,15 +285,6 @@
                     });
                 } else {
                     call.close();
-                }
-            });
-
-            videoEl.addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    if (videoEl.requestFullscreen) videoEl.requestFullscreen();
-                    else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
-                } else {
-                    if (document.exitFullscreen) document.exitFullscreen();
                 }
             });
         }
