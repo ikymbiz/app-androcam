@@ -41,13 +41,7 @@
         #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
         #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
         #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
-        #remote-video { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; z-index: 101; }
-        #youtube-input-area { display: flex; gap: 8px; width: 100%; margin-top: 15px; }
-        #youtube-url-input { flex: 1; padding: 8px 10px; border-radius: 6px; border: none; font-size: 13px; min-width: 0; }
-        #btn-youtube-set { background: #ff0000; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; }
-        /* カメラ側YouTube表示 */
-        #camera-youtube-wrap { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9998; }
-        #camera-youtube-wrap iframe { width: 100%; height: 100%; border: none; }
+        #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
         
         /* ビューアー操作ボタン群 */
         #viewer-controls { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; gap: 15px; width: 90%; justify-content: center;}
@@ -89,10 +83,6 @@
             <div id="viewer-qrcode"></div>
             <div id="viewer-link-display">リンク生成中...</div>
             <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
-            <div id="youtube-input-area">
-                <input id="youtube-url-input" type="text" placeholder="YouTube URL または 動画ID" />
-                <button id="btn-youtube-set">▶ 表示</button>
-            </div>
         </div>
         <video id="remote-video" autoplay playsinline></video>
         
@@ -102,9 +92,6 @@
         </div>
     </div>
 
-    <div id="camera-youtube-wrap">
-        <iframe id="camera-youtube-iframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
-    </div>
     <video id="my-video" autoplay muted playsinline></video>
 
     <script>
@@ -214,46 +201,18 @@
             const controlsEl = document.getElementById('viewer-controls');
             const recordBtn = document.getElementById('btn-record');
             const switchBtn = document.getElementById('btn-switch-cam');
-
-            // --- QRコード生成（YouTube IDも含める） ---
-            let currentPeerId = null;
-            let currentYoutubeId = '';
-
-            function generateQR() {
-                if (!currentPeerId) return;
-                const baseUrl = getBaseUrl();
-                let connectionLink = `${baseUrl}?id=${currentPeerId}&pin=${viewerPin}`;
-                if (currentYoutubeId) connectionLink += `&yt=${currentYoutubeId}`;
-                document.getElementById('viewer-link-display').textContent = connectionLink;
-                const qrcodeEl = document.getElementById('viewer-qrcode');
-                qrcodeEl.innerHTML = '';
-                new QRCode(qrcodeEl, { text: connectionLink, width: 200, height: 200 });
-            }
-
-            document.getElementById('btn-youtube-set').onclick = () => {
-                const input = document.getElementById('youtube-url-input').value.trim();
-                let videoId = '';
-                const urlMatch = input.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-                if (urlMatch) {
-                    videoId = urlMatch[1];
-                } else if (/^[A-Za-z0-9_-]{11}$/.test(input)) {
-                    videoId = input;
-                } else {
-                    alert('有効なYouTube URLまたは動画IDを入力してください');
-                    return;
-                }
-                currentYoutubeId = videoId;
-                generateQR();
-                document.getElementById('btn-youtube-set').textContent = '✓ 設定済';
-            };
-
+            
             let mediaRecorder;
             let recordedChunks = [];
             let currentDataConn = null;
 
             peer.on('open', (id) => {
-                currentPeerId = id;
-                generateQR();
+                const baseUrl = getBaseUrl();
+                const connectionLink = `${baseUrl}?id=${id}&pin=${viewerPin}`;
+                document.getElementById('viewer-link-display').textContent = connectionLink;
+                const qrcodeEl = document.getElementById('viewer-qrcode');
+                qrcodeEl.innerHTML = '';
+                new QRCode(qrcodeEl, { text: connectionLink, width: 200, height: 200 });
             });
 
             peer.on('connection', (conn) => {
@@ -267,13 +226,12 @@
                     statusEl.textContent = 'カメラが接続しました！映像を受信中...';
                     call.answer(); 
 
-                    function onStream(remoteStream) {
-                        if (videoEl.srcObject) return; // 二重発火防止
+                    call.on('stream', (remoteStream) => {
                         infoBox.style.display = 'none';
-                        videoEl.style.display = 'block';
+                        videoEl.style.display = 'block'; 
                         videoEl.srcObject = remoteStream;
-                        controlsEl.style.display = 'flex';
-
+                        controlsEl.style.display = 'flex'; 
+                        
                         // --- 録画機能 (MP4対応) ---
                         recordBtn.onclick = (e) => {
                             e.stopPropagation(); 
@@ -283,14 +241,19 @@
                                 recordBtn.style.backgroundColor = '#dc3545';
                             } else {
                                 recordedChunks = [];
+                                
+                                // ブラウザがMP4に対応しているかチェック。非対応ならWebMにフォールバック
                                 let mimeType = 'video/mp4';
                                 if (!MediaRecorder.isTypeSupported(mimeType)) {
                                     mimeType = 'video/webm';
                                 }
+
                                 mediaRecorder = new MediaRecorder(remoteStream, { mimeType: mimeType });
+                                
                                 mediaRecorder.ondataavailable = (e) => { 
                                     if (e.data.size > 0) recordedChunks.push(e.data); 
                                 };
+                                
                                 mediaRecorder.onstop = () => {
                                     const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
                                     const blob = new Blob(recordedChunks, { type: mimeType });
@@ -303,6 +266,7 @@
                                     a.click();
                                     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
                                 };
+                                
                                 mediaRecorder.start();
                                 recordBtn.textContent = '⏹ 録画停止';
                                 recordBtn.style.backgroundColor = '#6c757d';
@@ -318,21 +282,18 @@
                                 alert("カメラとの通信が確立されていません");
                             }
                         };
-                    }
-
-                    call.on('stream', onStream);
-
-                    // PeerJSのstreamが発火しない場合のフォールバック
-                    call.peerConnection.addEventListener('track', () => {
-                        const tracks = call.peerConnection.getReceivers()
-                            .map(r => r.track)
-                            .filter(t => t);
-                        if (tracks.length > 0) {
-                            onStream(new MediaStream(tracks));
-                        }
                     });
                 } else {
                     call.close();
+                }
+            });
+
+            videoEl.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    if (videoEl.requestFullscreen) videoEl.requestFullscreen();
+                    else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
                 }
             });
         }
@@ -356,14 +317,6 @@
                 
                 currentCall = peer.call(targetId, stream, { metadata: { password: targetPw } });
                 currentCall.on('error', (err) => console.error('映像接続エラー:', err));
-
-                // 接続完了後にYouTube表示
-                const ytId = new URLSearchParams(window.location.search).get('yt');
-                if (ytId) {
-                    const wrap = document.getElementById('camera-youtube-wrap');
-                    document.getElementById('camera-youtube-iframe').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0`;
-                    wrap.style.display = 'block';
-                }
 
                 const dataConn = peer.connect(targetId, { metadata: { password: targetPw } });
                 dataConn.on('open', () => {
