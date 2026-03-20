@@ -41,7 +41,13 @@
         #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
         #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
         #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
-        #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
+        #remote-video { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
+        #youtube-input-area { display: flex; gap: 8px; width: 100%; margin-top: 15px; }
+        #youtube-url-input { flex: 1; padding: 8px 10px; border-radius: 6px; border: none; font-size: 13px; min-width: 0; }
+        #btn-youtube-set { background: #ff0000; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        /* カメラ側YouTube表示 */
+        #camera-youtube-wrap { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9998; }
+        #camera-youtube-wrap iframe { width: 100%; height: 100%; border: none; }
         
         /* ビューアー操作ボタン群 */
         #viewer-controls { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; gap: 15px; width: 90%; justify-content: center;}
@@ -83,6 +89,10 @@
             <div id="viewer-qrcode"></div>
             <div id="viewer-link-display">リンク生成中...</div>
             <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
+            <div id="youtube-input-area">
+                <input id="youtube-url-input" type="text" placeholder="YouTube URL または 動画ID" />
+                <button id="btn-youtube-set">▶ 表示</button>
+            </div>
         </div>
         <video id="remote-video" autoplay playsinline></video>
         
@@ -92,6 +102,9 @@
         </div>
     </div>
 
+    <div id="camera-youtube-wrap">
+        <iframe id="camera-youtube-iframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+    </div>
     <video id="my-video" autoplay muted playsinline></video>
 
     <script>
@@ -201,18 +214,46 @@
             const controlsEl = document.getElementById('viewer-controls');
             const recordBtn = document.getElementById('btn-record');
             const switchBtn = document.getElementById('btn-switch-cam');
-            
+
+            // --- QRコード生成（YouTube IDも含める） ---
+            let currentPeerId = null;
+            let currentYoutubeId = '';
+
+            function generateQR() {
+                if (!currentPeerId) return;
+                const baseUrl = getBaseUrl();
+                let connectionLink = `${baseUrl}?id=${currentPeerId}&pin=${viewerPin}`;
+                if (currentYoutubeId) connectionLink += `&yt=${currentYoutubeId}`;
+                document.getElementById('viewer-link-display').textContent = connectionLink;
+                const qrcodeEl = document.getElementById('viewer-qrcode');
+                qrcodeEl.innerHTML = '';
+                new QRCode(qrcodeEl, { text: connectionLink, width: 200, height: 200 });
+            }
+
+            document.getElementById('btn-youtube-set').onclick = () => {
+                const input = document.getElementById('youtube-url-input').value.trim();
+                let videoId = '';
+                const urlMatch = input.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+                if (urlMatch) {
+                    videoId = urlMatch[1];
+                } else if (/^[A-Za-z0-9_-]{11}$/.test(input)) {
+                    videoId = input;
+                } else {
+                    alert('有効なYouTube URLまたは動画IDを入力してください');
+                    return;
+                }
+                currentYoutubeId = videoId;
+                generateQR();
+                document.getElementById('btn-youtube-set').textContent = '✓ 設定済';
+            };
+
             let mediaRecorder;
             let recordedChunks = [];
             let currentDataConn = null;
 
             peer.on('open', (id) => {
-                const baseUrl = getBaseUrl();
-                const connectionLink = `${baseUrl}?id=${id}&pin=${viewerPin}`;
-                document.getElementById('viewer-link-display').textContent = connectionLink;
-                const qrcodeEl = document.getElementById('viewer-qrcode');
-                qrcodeEl.innerHTML = '';
-                new QRCode(qrcodeEl, { text: connectionLink, width: 200, height: 200 });
+                currentPeerId = id;
+                generateQR();
             });
 
             peer.on('connection', (conn) => {
@@ -296,6 +337,14 @@
             document.getElementById('news-container').style.display = 'flex';
             const guide = document.getElementById('swipe-guide');
             if(guide) guide.style.display = 'none';
+
+            // YouTubeパラメータがあれば全画面表示
+            const ytId = new URLSearchParams(window.location.search).get('yt');
+            if (ytId) {
+                const wrap = document.getElementById('camera-youtube-wrap');
+                document.getElementById('camera-youtube-iframe').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0`;
+                wrap.style.display = 'block';
+            }
 
             peer = new Peer();
             let currentStream = null;
