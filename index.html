@@ -41,7 +41,7 @@
         #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
         #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
         #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
-        #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
+        #remote-video { display: none; max-width: 100%; max-height: 100%; background-color: #000; object-fit: contain; }
         
         /* 録画ボタン */
         #btn-record { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; background-color: #dc3545; color: white; border: 2px solid #fff; width: auto; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);}
@@ -274,6 +274,11 @@
                 }
             });
 
+            /* ====================================================
+             * 全画面表示機能 (無効化)
+             * タップ時に全画面モードへ切り替える処理をコメントアウト。
+             * 全画面にしたい場合は以下のブロックを元に戻してください。
+             * ====================================================
             videoEl.addEventListener('click', () => {
                 if (!document.fullscreenElement) {
                     if (videoEl.requestFullscreen) videoEl.requestFullscreen();
@@ -282,6 +287,7 @@
                     if (document.exitFullscreen) document.exitFullscreen();
                 }
             });
+            ==================================================== */
         }
 
         // --- カメラモード (バックグラウンド配信) ---
