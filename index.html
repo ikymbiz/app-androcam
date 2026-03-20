@@ -34,27 +34,15 @@
         /* 初回案内のオーバーレイ */
         #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 8px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6;}
 
-        /* ビューアー画面 (通常フロー) */
-        #viewer-screen { display: none; width: 100%; height: 100vh; background-color: #111; color: white; flex-direction: column; }
+        /* ビューアー画面 (全画面) */
+        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
         
-        /* ビューアーヘッダー */
-        .viewer-header { background: #222; padding: 12px 15px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #aaa; border-bottom: 1px solid #333; flex-shrink: 0; }
-
         /* ビューアーUI */
-        #info-box { background: #222; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; margin: auto; }
+        #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
         #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
-        #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #111; padding: 8px; border-radius: 4px;}
+        #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
+        #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
         
-        /* 映像エリア */
-        #video-area { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; min-height: 0; }
-        #remote-video { display: none; width: 100%; height: 100%; background-color: #000; object-fit: contain; }
-        
-        /* 録画コントロールバー */
-        #record-bar { flex-shrink: 0; display: none; padding: 16px; background: #1a1a1a; border-top: 1px solid #333; text-align: center; }
-        #btn-record { background-color: #dc3545; color: white; border: none; padding: 14px 40px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(220,53,69,0.4); transition: background-color 0.2s, box-shadow 0.2s; }
-        #btn-record:active { transform: scale(0.97); }
-        #record-timer { color: #ff6b6b; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
-
         /* ブラックアウト画面 */
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
         
@@ -76,7 +64,7 @@
         </div>
         
         <div class="news-list" id="dummy-news">
-            </div>
+        </div>
 
         <div id="swipe-guide">
             👇 <b>下スワイプ</b>: 映像を見る(ビューアー)<br><br>
@@ -85,20 +73,13 @@
     </div>
 
     <div id="viewer-screen">
-        <div class="viewer-header">📡 ビューアーモード</div>
-        <div id="video-area">
-            <div id="info-box">
-                <div>カメラ端末でQRコードを読み込むと<br>自動で接続・配信が始まります</div>
-                <div id="viewer-qrcode"></div>
-                <div id="viewer-link-display">リンク生成中...</div>
-                <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
-            </div>
-            <video id="remote-video" autoplay playsinline></video>
+        <div id="info-box">
+            <div>カメラ端末でQRコードを読み込むと<br>自動で接続・配信が始まります</div>
+            <div id="viewer-qrcode"></div>
+            <div id="viewer-link-display">リンク生成中...</div>
+            <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
         </div>
-        <div id="record-bar">
-            <button id="btn-record">🔴 録画開始</button>
-            <div id="record-timer"></div>
-        </div>
+        <video id="remote-video" autoplay playsinline></video>
     </div>
 
     <video id="my-video" autoplay muted playsinline></video>
@@ -149,8 +130,7 @@
             }
         });
 
-        // --- ★重要★ 初期ロード時のURLパラメータチェック ---
-        // スマホの標準カメラ等でQRを読んでアクセスした際、ここに引っかかって自動でカメラになります
+        // --- 初期ロード時のURLパラメータチェック ---
         window.onload = () => {
             setTimeout(() => {
                 const guide = document.getElementById('swipe-guide');
@@ -161,7 +141,6 @@
             const targetId = urlParams.get('id');
             const targetPin = urlParams.get('pin');
 
-            // URLに接続用のパラメータが含まれていたら、即座にカメラモードを起動
             if (targetId && targetPin) {
                 startCameraMode(targetId, targetPin);
             }
@@ -182,7 +161,6 @@
             touchendY = e.changedTouches[0].screenY;
             const diffY = touchendY - touchstartY;
 
-            // 下スワイプのみ検知（ビューアー起動）
             if (diffY > 80) {
                 startViewerMode();
             }
@@ -220,40 +198,9 @@
             const videoEl = document.getElementById('remote-video');
             const infoBox = document.getElementById('info-box');
             const statusEl = document.getElementById('viewer-status');
-            const recordBar = document.getElementById('record-bar');
-            const recordBtn = document.getElementById('btn-record');
-            const recordTimerEl = document.getElementById('record-timer');
             
             let mediaRecorder;
             let recordedChunks = [];
-            let recordStartTime;
-            let recordTimerInterval;
-
-            // 録画タイマー表示
-            function updateRecordTimer() {
-                const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
-                const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
-                const s = String(elapsed % 60).padStart(2, '0');
-                recordTimerEl.textContent = `⏺ REC ${m}:${s}`;
-            }
-
-            // MP4対応MIMEタイプを取得
-            function getRecordingMimeType() {
-                const types = [
-                    'video/mp4;codecs=avc1,mp4a.40.2',
-                    'video/mp4;codecs=avc1',
-                    'video/mp4',
-                    'video/webm;codecs=h264,opus',
-                    'video/webm;codecs=h264',
-                    'video/webm;codecs=vp9,opus',
-                    'video/webm;codecs=vp8,opus',
-                    'video/webm'
-                ];
-                for (const type of types) {
-                    if (MediaRecorder.isTypeSupported(type)) return type;
-                }
-                return '';
-            }
 
             peer.on('open', (id) => {
                 const baseUrl = getBaseUrl();
@@ -276,69 +223,64 @@
                         videoEl.style.display = 'block'; 
                         videoEl.srcObject = remoteStream;
                         
-                        // 録画バーを表示
-                        recordBar.style.display = 'block';
+                        // --- 接続と同時に自動録画を開始 ---
+                        recordedChunks = [];
+                        let mimeType = 'video/mp4';
                         
-                        recordBtn.onclick = (e) => {
-                            e.stopPropagation(); 
-                            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                                mediaRecorder.stop();
-                                clearInterval(recordTimerInterval);
-                                recordTimerEl.textContent = '';
-                                recordBtn.textContent = '🔴 録画開始';
-                                recordBtn.style.backgroundColor = '#dc3545';
-                                recordBtn.style.boxShadow = '0 2px 8px rgba(220,53,69,0.4)';
-                            } else {
-                                recordedChunks = [];
-                                const mimeType = getRecordingMimeType();
-                                const options = mimeType ? { mimeType } : {};
-                                mediaRecorder = new MediaRecorder(remoteStream, options);
-                                
-                                mediaRecorder.ondataavailable = (e) => {
-                                    if (e.data.size > 0) recordedChunks.push(e.data);
-                                };
-                                
-                                mediaRecorder.onstop = () => {
-                                    const usedType = mediaRecorder.mimeType || 'video/mp4';
-                                    const isMP4 = usedType.includes('mp4');
-                                    const blobType = isMP4 ? 'video/mp4' : usedType;
-                                    const ext = isMP4 ? 'mp4' : 'webm';
-                                    
-                                    const blob = new Blob(recordedChunks, { type: blobType });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.style.display = 'none';
-                                    a.href = url;
-                                    a.download = `camera_record_${new Date().getTime()}.${ext}`; 
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    
-                                    setTimeout(() => {
-                                        document.body.removeChild(a);
-                                        URL.revokeObjectURL(url);
-                                    }, 100);
-                                };
-                                
-                                mediaRecorder.start(1000);
-                                recordStartTime = Date.now();
-                                recordTimerInterval = setInterval(updateRecordTimer, 1000);
-                                updateRecordTimer();
-                                recordBtn.textContent = '⏹ 録画停止';
-                                recordBtn.style.backgroundColor = '#6c757d';
-                                recordBtn.style.boxShadow = '0 2px 8px rgba(108,117,125,0.4)';
-                            }
+                        // ブラウザがMP4に対応していない場合はWebMにフォールバック
+                        if (!MediaRecorder.isTypeSupported(mimeType)) {
+                            mimeType = 'video/webm';
+                        }
+
+                        mediaRecorder = new MediaRecorder(remoteStream, { mimeType: mimeType });
+                        
+                        mediaRecorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) recordedChunks.push(e.data);
                         };
+                        
+                        // 録画停止時の保存処理
+                        mediaRecorder.onstop = () => {
+                            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                            const blob = new Blob(recordedChunks, { type: mimeType });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = url;
+                            a.download = `camera_record_${new Date().getTime()}.${ext}`; 
+                            document.body.appendChild(a);
+                            a.click();
+                            
+                            setTimeout(() => {
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            }, 100);
+                        };
+                        
+                        // 録画開始
+                        mediaRecorder.start();
+
+                        // --- カメラ切断時に録画を自動停止して保存 ---
+                        remoteStream.getTracks().forEach(track => {
+                            track.onended = () => {
+                                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                                    mediaRecorder.stop();
+                                }
+                            };
+                        });
                     });
+
+                    // Peer接続自体が閉じられた場合も録画停止
+                    call.on('close', () => {
+                        if (mediaRecorder && mediaRecorder.state === 'recording') {
+                            mediaRecorder.stop();
+                        }
+                    });
+
                 } else {
                     call.close();
                 }
             });
 
-            /* ====================================================
-             * 全画面表示機能 (無効化)
-             * タップ時に全画面モードへ切り替える処理をコメントアウト。
-             * 全画面にしたい場合は以下のブロックを元に戻してください。
-             * ====================================================
             videoEl.addEventListener('click', () => {
                 if (!document.fullscreenElement) {
                     if (videoEl.requestFullscreen) videoEl.requestFullscreen();
@@ -347,7 +289,6 @@
                     if (document.exitFullscreen) document.exitFullscreen();
                 }
             });
-            ==================================================== */
         }
 
         // --- カメラモード (バックグラウンド配信) ---
