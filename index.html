@@ -34,23 +34,23 @@
         /* 初回案内のオーバーレイ */
         #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 8px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6;}
 
-        /* ビューアー画面 (全画面) */
+        /* ビューアー画面 */
         #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
-        
-        /* ビューアーUI */
         #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; z-index: 110;}
         #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
         #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
         #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
         
-        /* 保存・終了ボタン */
-        #btn-save-exit { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; background-color: #28a745; color: white; border: 2px solid #fff; width: auto; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);}
-        #btn-fallback-save { display: none; margin-top: 15px; background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%;}
+        /* 視聴中の保存・終了ボタン */
+        #btn-save-exit { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; background-color: #dc3545; color: white; border: 2px solid #fff; width: auto; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);}
+
+        /* スマホ保存用の最終画面（セキュリティ対策） */
+        #download-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
+        #btn-final-download { background-color: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 30px; font-size: 18px; font-weight: bold; margin-bottom: 20px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        #btn-back-home { background-color: #555; color: white; padding: 12px 24px; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; }
 
         /* ブラックアウト画面 */
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
-        
-        /* 隠しカメラ用要素 */
         #my-video { display: none; }
     </style>
 </head>
@@ -80,12 +80,16 @@
             <div id="viewer-qrcode"></div>
             <div id="viewer-link-display">リンク生成中...</div>
             <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
-            
-            <button id="btn-fallback-save">📥 録画データを保存する</button>
         </div>
         <video id="remote-video" autoplay playsinline></video>
-        
-        <button id="btn-save-exit">⏹ 保存して終了</button>
+        <button id="btn-save-exit">⏹ 録画を終了して保存</button>
+    </div>
+
+    <div id="download-screen">
+        <h2 style="color: #0f0;">録画データが完成しました</h2>
+        <p style="color: #aaa; margin-bottom: 30px;">下のボタンを押すとスマホ本体に保存されます</p>
+        <button id="btn-final-download">📥 動画をスマホに保存する</button>
+        <button id="btn-back-home">🔙 最初に戻る</button>
     </div>
 
     <video id="my-video" autoplay muted playsinline></video>
@@ -94,13 +98,8 @@
         let peer;
         let currentMode = 'initial'; 
         
-        const newsTitles = [
-            "全国的に冷え込み強まる！ 明日にかけ積雪注意", "最新スマートフォンの売上高が過去最高を記録", 
-            "週末のイベント情報：各地でフェスティバル開催", "日経平均株価、一時300円超の値下がり",
-            "スポーツ速報：日本代表が劇的な逆転勝利", "話題のAI技術、日常生活への導入が加速",
-            "新種の海洋生物を発見、生態系の解明へ", "有名俳優の電撃結婚発表にSNS騒然",
-            "来年度の税制改正案、ポイントを徹底解説", "人気のカフェチェーン、秋の新作メニュー公開"
-        ];
+        // ダミー記事生成
+        const newsTitles = ["全国的に冷え込み強まる 明日にかけ積雪注意", "最新スマートフォンの売上高が過去最高を記録", "週末のイベント情報：各地でフェスティバル開催", "日経平均株価、一時300円超の値下がり", "スポーツ速報：日本代表が劇的な逆転勝利", "話題のAI技術、日常生活への導入が加速", "新種の海洋生物を発見、生態系の解明へ", "有名俳優の電撃結婚発表にSNS騒然", "来年度の税制改正案、ポイントを徹底解説", "人気のカフェチェーン、秋の新作メニュー公開"];
         const dummyNewsContainer = document.getElementById('dummy-news');
         for (let i = 0; i < 20; i++) {
             const item = document.createElement('div');
@@ -138,13 +137,10 @@
             const targetId = urlParams.get('id');
             const targetPin = urlParams.get('pin');
 
-            if (targetId && targetPin) {
-                startCameraMode(targetId, targetPin);
-            }
+            if (targetId && targetPin) startCameraMode(targetId, targetPin);
         };
 
-        let touchstartY = 0;
-        let touchendY = 0;
+        let touchstartY = 0; let touchendY = 0;
         const newsContainer = document.getElementById('news-container');
 
         newsContainer.addEventListener('touchstart', e => {
@@ -158,8 +154,7 @@
             if (touchendY - touchstartY > 80) startViewerMode();
         }, {passive: true});
 
-        let clickCount = 0;
-        let clickTimer;
+        let clickCount = 0; let clickTimer;
         newsContainer.addEventListener('click', () => {
             if (currentMode !== 'camera') return;
             clickCount++;
@@ -190,7 +185,11 @@
             const infoBox = document.getElementById('info-box');
             const statusEl = document.getElementById('viewer-status');
             const saveExitBtn = document.getElementById('btn-save-exit');
-            const fallbackSaveBtn = document.getElementById('btn-fallback-save');
+            
+            // 保存画面の要素
+            const downloadScreen = document.getElementById('download-screen');
+            const finalDownloadBtn = document.getElementById('btn-final-download');
+            const backHomeBtn = document.getElementById('btn-back-home');
             
             let mediaRecorder;
             let recordedChunks = [];
@@ -217,53 +216,41 @@
                         videoEl.srcObject = remoteStream;
                         saveExitBtn.style.display = 'block';
                         
-                        // --- 接続と同時に自動録画を開始 ---
+                        // --- 接続と同時に自動録画開始 ---
                         recordedChunks = [];
-                        let mimeType = 'video/mp4';
-                        if (!MediaRecorder.isTypeSupported(mimeType)) {
-                            mimeType = 'video/webm';
+                        let options = {};
+                        if (MediaRecorder.isTypeSupported('video/mp4')) {
+                            options = { mimeType: 'video/mp4' };
+                            fileExt = 'mp4';
+                        } else if (MediaRecorder.isTypeSupported('video/webm')) {
+                            options = { mimeType: 'video/webm' };
+                            fileExt = 'webm';
                         }
-                        fileExt = mimeType.includes('mp4') ? 'mp4' : 'webm';
 
-                        mediaRecorder = new MediaRecorder(remoteStream, { mimeType: mimeType });
+                        mediaRecorder = new MediaRecorder(remoteStream, options);
                         
                         mediaRecorder.ondataavailable = (e) => {
                             if (e.data.size > 0) recordedChunks.push(e.data);
                         };
                         
-                        // 録画停止時のデータ生成処理
+                        // 録画データ生成完了時
                         mediaRecorder.onstop = () => {
-                            const blob = new Blob(recordedChunks, { type: mimeType });
+                            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
                             finalVideoUrl = URL.createObjectURL(blob);
                             
-                            // 保存して終了ボタン経由の場合は自動ダウンロードを試みる
-                            if (isManualStop) {
-                                triggerDownload();
-                                alert("録画データを保存しました。");
-                                location.reload(); // 最初に戻る
-                            } else {
-                                // カメラ側から突然切断された場合は、セキュリティ上自動ダウンロードできない事があるためボタンを表示
-                                videoEl.style.display = 'none';
-                                saveExitBtn.style.display = 'none';
-                                infoBox.style.display = 'flex';
-                                document.getElementById('viewer-qrcode').style.display = 'none';
-                                document.getElementById('viewer-link-display').style.display = 'none';
-                                statusEl.textContent = 'カメラの接続が切れました。';
-                                statusEl.style.color = '#ffeb3b';
-                                fallbackSaveBtn.style.display = 'block'; // 救済用手動保存ボタンを表示
-                            }
+                            // ビューアーを隠して、保存専用画面を表示する
+                            document.getElementById('viewer-screen').style.display = 'none';
+                            downloadScreen.style.display = 'flex';
                         };
                         
-                        // 録画スタート
                         mediaRecorder.start();
 
-                        // 通信切断の検知 (カメラ側が閉じた時など)
+                        // 通信切断の検知
                         call.peerConnection.addEventListener('iceconnectionstatechange', () => {
                             const state = call.peerConnection.iceConnectionState;
                             if (state === 'disconnected' || state === 'failed' || state === 'closed') {
                                 if (mediaRecorder && mediaRecorder.state === 'recording') {
-                                    isManualStop = false;
-                                    mediaRecorder.stop();
+                                    mediaRecorder.stop(); // これで自動的に保存画面へ移行します
                                 }
                             }
                         });
@@ -273,10 +260,17 @@
                 }
             });
 
-            let isManualStop = false;
+            // 「録画を終了して保存」ボタン（録画停止のトリガー）
+            saveExitBtn.addEventListener('click', () => {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    saveExitBtn.textContent = 'データ生成中...';
+                    saveExitBtn.style.backgroundColor = '#6c757d';
+                    mediaRecorder.stop(); // これによりonstopが発火し、保存画面へ移行します
+                }
+            });
 
-            // ダウンロード実行用の共通関数
-            function triggerDownload() {
+            // スマホにダウンロード実行（セキュリティを突破する直接クリック）
+            finalDownloadBtn.addEventListener('click', () => {
                 if(!finalVideoUrl) return;
                 const a = document.createElement('a');
                 a.style.display = 'none';
@@ -285,24 +279,13 @@
                 document.body.appendChild(a);
                 a.click();
                 setTimeout(() => document.body.removeChild(a), 100);
-            }
-
-            // 【手動】視聴中に保存して終了するボタン（これが一番確実です）
-            saveExitBtn.addEventListener('click', () => {
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    isManualStop = true;
-                    saveExitBtn.textContent = '保存処理中...';
-                    saveExitBtn.style.backgroundColor = '#6c757d';
-                    mediaRecorder.stop(); // これによりonstopが発火し、ダウンロードされる
-                }
+                
+                finalDownloadBtn.textContent = '保存完了！';
+                finalDownloadBtn.style.backgroundColor = '#6c757d';
             });
 
-            // 【救済】カメラ側が先に切れた時に表示される保存ボタン
-            fallbackSaveBtn.addEventListener('click', () => {
-                triggerDownload();
-                fallbackSaveBtn.textContent = '保存完了！';
-                fallbackSaveBtn.style.backgroundColor = '#6c757d';
-                setTimeout(() => location.reload(), 1500); // 1.5秒後に最初に戻る
+            backHomeBtn.addEventListener('click', () => {
+                location.reload();
             });
 
             videoEl.addEventListener('click', () => {
