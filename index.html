@@ -2,22 +2,26 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
+        :root {
+            --app-height: 100vh;
+        }
+
         /* 全体・リセット */
-        body, html { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f5f7; width: 100%; height: 100%; }
+        body, html { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f5f7; width: 100%; height: var(--app-height); }
         * { box-sizing: border-box; }
         
         /* モードごとのスクロール制御 */
         body.mode-initial { overflow: hidden; touch-action: none; }
-        body.mode-camera { overflow: hidden; touch-action: auto; } /* カメラ側は基本的にスクロール不要に */
+        body.mode-camera { overflow: hidden; touch-action: auto; }
 
         /* ニュースサイトのモックUI (カメラ側通常時) */
-        #news-container { width: 100%; min-height: 100vh; background: #fff; display: flex; flex-direction: column; }
-        .header { background-color: #ff0033; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; font-weight: bold; font-size: 20px;}
+        #news-container { width: 100%; min-height: var(--app-height); background: #fff; display: flex; flex-direction: column; }
+        .header { background-color: #ff0033; color: white; padding: calc(env(safe-area-inset-top, 0px) + 15px) 15px 15px 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; font-weight: bold; font-size: 20px;}
         .header-nav { display: flex; gap: 15px; background: #fff; padding: 10px 15px; border-bottom: 1px solid #ddd; overflow-x: auto; font-size: 14px; font-weight: bold; color: #555;}
         .header-nav span { white-space: nowrap; }
         .header-nav span.active { color: #ff0033; border-bottom: 2px solid #ff0033; padding-bottom: 5px; }
@@ -25,7 +29,7 @@
         #btn-settings-open:active { transform: scale(0.9); }
         
         /* ニュース記事リスト */
-        .news-list { padding: 10px; flex-grow: 1; }
+        .news-list { padding: 10px; flex-grow: 1; padding-bottom: env(safe-area-inset-bottom, 10px); overflow-y: auto;}
         .news-item { display: flex; padding: 12px 0; border-bottom: 1px solid #eee; }
         .news-thumb { width: 80px; height: 80px; background-color: #ddd; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px;}
         .news-content { margin-left: 12px; display: flex; flex-direction: column; justify-content: space-between;}
@@ -36,48 +40,48 @@
         #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 12px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6; width: 80%; max-width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.4);}
 
         /* ビューアー画面 (モダン・クリーンUI) */
-        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
+        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-height); background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
         
         /* 接続待機状態 */
-        #viewer-waiting-state { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; gap: 20px; padding: 20px; box-sizing: border-box; }
-        .viewer-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 15px; max-width: 400px; width: 90%; background: rgba(255,255,255,0.05); padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
+        #viewer-waiting-state { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: var(--app-height); gap: 20px; padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px); box-sizing: border-box; overflow-y: auto;}
+        .viewer-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 15px; max-width: 400px; width: 90%; background: rgba(255,255,255,0.05); padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); max-height: 100%; overflow-y: auto;}
         .guide-text { font-size: 15px; line-height: 1.6; text-align: center; color: #eee; margin: 0; font-weight: bold;}
         #viewer-qrcode-container { padding: 15px; background-color: #fff; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);}
-        #viewer-qrcode canvas { display: block; }
+        #viewer-qrcode canvas { display: block; max-width: 100%; height: auto;}
         #viewer-status { font-size: 14px; color: #00d26a; font-weight: bold; margin: 0; letter-spacing: 1px;}
-        .viewer-link-section { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 8px 10px 8px 15px; border-radius: 30px; width: 100%; border: 1px solid rgba(255,255,255,0.1);}
+        .viewer-link-section { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 8px 10px 8px 15px; border-radius: 30px; width: 100%; border: 1px solid rgba(255,255,255,0.1); margin-top: 5px;}
         #viewer-link-display { font-size: 13px; color: #ccc; word-break: break-all; text-align: left; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-right: 10px; flex-grow: 1; }
         
         /* 映像視聴状態 */
-        #viewer-watching-state { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative; }
-        #remote-video { width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
+        #viewer-watching-state { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: var(--app-height); position: relative; }
+        #remote-video { width: 100vw; height: 100%; background-color: #000; object-fit: contain; }
         
         /* ボタン類共通 */
         .icon-button { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; font-size: 20px; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 120; backdrop-filter: blur(4px); transition: background 0.2s;}
         .icon-button:active { background: rgba(255,255,255,0.2); }
-        .top-right-button { position: absolute; top: 20px; right: 20px; }
-        .bottom-right-button { position: absolute; bottom: 30px; right: 30px; background: rgba(0, 123, 255, 0.8); border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); width: 56px; height: 56px; font-size: 24px;}
+        .top-right-button { position: absolute; top: calc(env(safe-area-inset-top, 20px) + 20px); right: 20px; }
+        .bottom-right-button { position: absolute; bottom: calc(env(safe-area-inset-bottom, 20px) + 30px); right: 30px; background: rgba(0, 123, 255, 0.8); border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); width: 56px; height: 56px; font-size: 24px;}
         .bottom-right-button:active { transform: scale(0.95); }
         .action-button { background-color: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: transform 0.1s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
         .action-button:active { transform: scale(0.95); }
         #btn-copy-link { padding: 8px 16px; font-size: 13px; border-radius: 20px; background: #0056b3; }
 
         /* スマホ保存用の最終画面 */
-        #download-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #1a1a1a; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
-        #recorded-video { width: 90%; max-width: 400px; max-height: 40vh; background-color: #000; border: 2px solid #444; border-radius: 12px; margin-bottom: 20px; }
+        #download-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-height); background-color: #1a1a1a; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; padding: env(safe-area-inset-top, 20px) 20px env(safe-area-inset-bottom, 20px) 20px; overflow-y: auto; box-sizing: border-box;}
+        #recorded-video { width: 100%; max-width: 400px; max-height: 40vh; background-color: #000; border: 2px solid #444; border-radius: 12px; margin-bottom: 20px; object-fit: contain;}
         #btn-final-download { background-color: #00d26a; color: #000; padding: 16px 32px; border: none; border-radius: 30px; font-size: 16px; font-weight: bold; margin-bottom: 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,210,106,0.3); text-decoration: none; display: inline-block; transition: transform 0.1s;}
         #btn-final-download:active { transform: scale(0.95); }
         #btn-back-home { background-color: transparent; color: #aaa; padding: 12px 24px; border: 1px solid #555; border-radius: 30px; font-size: 14px; cursor: pointer; transition: background 0.2s;}
         #btn-back-home:active { background-color: rgba(255,255,255,0.1); }
 
         /* ブラックアウト画面 / YouTube 背景 */
-        #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
+        #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-height); background-color: #000; z-index: 9999; }
         
-        #youtube-container { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 5; }
+        #youtube-container { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-height); background: #000; z-index: 5; }
         #youtube-player { width: 100%; height: 100%; pointer-events: none; } /* iframeでの直接タップを防ぐ */
         
         /* YouTube / カメラ操作用 UI */
-        .yt-controls { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 40px; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);}
+        .yt-controls { position: absolute; bottom: calc(env(safe-area-inset-bottom, 20px) + 40px); left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 40px; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);}
         .yt-controls.show { opacity: 1; pointer-events: auto; }
         .yt-btn { background: rgba(255,255,255,0.15); border: none; color: white; font-size: 20px; cursor: pointer; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
         .yt-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
@@ -85,8 +89,8 @@
         #my-video { display: none; }
 
         /* 設定モーダル */
-        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(5px);}
-        .modal-content { background: #fff; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 20px; color: #333; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-height); background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(5px); padding: 20px; box-sizing: border-box;}
+        .modal-content { background: #fff; padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 20px; color: #333; box-shadow: 0 10px 40px rgba(0,0,0,0.3); max-height: 100%; overflow-y: auto;}
         .modal-content h2 { margin: 0; font-size: 20px; text-align: center; font-weight: bold;}
         .modal-content label { display: flex; flex-direction: column; font-size: 13px; font-weight: bold; gap: 8px; color: #555;}
         .modal-content label.checkbox-label { flex-direction: row; align-items: center; cursor: pointer; font-size: 14px;}
@@ -101,7 +105,7 @@
 
         /* トースト通知 */
         #toast { position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.9); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: bold; transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10000; pointer-events: none; white-space: nowrap; box-shadow: 0 5px 15px rgba(0,0,0,0.3); backdrop-filter: blur(5px);}
-        #toast.show { bottom: 40px; }
+        #toast.show { bottom: calc(env(safe-area-inset-bottom, 20px) + 40px); }
     </style>
 </head>
 <body class="mode-initial">
@@ -204,6 +208,15 @@
     <video id="my-video" autoplay muted playsinline></video>
 
     <script>
+        // --- モバイル表示の高さ調整 (--app-height) ---
+        const setAppHeight = () => {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        };
+        window.addEventListener('resize', setAppHeight);
+        window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 100));
+        setAppHeight();
+
         // --- IndexedDB ユーティリティ ---
         const DB_NAME = 'WebRTCCameraDB';
         const DB_VERSION = 1;
@@ -566,7 +579,7 @@
             const resetApp = () => location.reload();
             document.getElementById('btn-close-viewer').addEventListener('click', resetApp);
             
-            // 視聴終了時に自動で録画を止めて保存画面へ移行
+            // 視聴終了時に自動で録画を止める（onstopイベントにより自動で保存画面へ移行する）
             document.getElementById('btn-exit-watching').addEventListener('click', () => {
                 if (mediaRecorder && mediaRecorder.state === 'recording') {
                     mediaRecorder.stop(); 
