@@ -13,7 +13,7 @@
         
         /* モードごとのスクロール制御 */
         body.mode-initial { overflow: hidden; touch-action: none; }
-        body.mode-camera { overflow: auto; touch-action: auto; }
+        body.mode-camera { overflow: hidden; touch-action: auto; } /* カメラ側は基本的にスクロール不要に */
 
         /* ニュースサイトのモックUI (カメラ側通常時) */
         #news-container { width: 100%; min-height: 100vh; background: #fff; display: flex; flex-direction: column; }
@@ -56,6 +56,8 @@
         .icon-button { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; font-size: 20px; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 120; backdrop-filter: blur(4px); transition: background 0.2s;}
         .icon-button:active { background: rgba(255,255,255,0.2); }
         .top-right-button { position: absolute; top: 20px; right: 20px; }
+        .bottom-right-button { position: absolute; bottom: 30px; right: 30px; background: rgba(0, 123, 255, 0.8); border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); width: 56px; height: 56px; font-size: 24px;}
+        .bottom-right-button:active { transform: scale(0.95); }
         .action-button { background-color: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: transform 0.1s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
         .action-button:active { transform: scale(0.95); }
         #btn-copy-link { padding: 8px 16px; font-size: 13px; border-radius: 20px; background: #0056b3; }
@@ -79,9 +81,6 @@
         .yt-controls.show { opacity: 1; pointer-events: auto; }
         .yt-btn { background: rgba(255,255,255,0.15); border: none; color: white; font-size: 20px; cursor: pointer; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
         .yt-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
-
-        #camera-controls-overlay { position: fixed; bottom: 20px; left: 20px; z-index: 1000; display: none; }
-        #btn-toggle-camera { background: rgba(0, 0, 0, 0.6); }
 
         #my-video { display: none; }
 
@@ -117,11 +116,6 @@
             <button id="yt-play-pause" class="yt-btn">⏸</button>
             <button id="yt-mute-unmute" class="yt-btn">🔇</button>
         </div>
-    </div>
-
-    <!-- カメラ側: カメラ切り替え操作 -->
-    <div id="camera-controls-overlay">
-        <button id="btn-toggle-camera" class="icon-button">🔄</button>
     </div>
 
     <!-- ニュースサイトモック (カメラ通常時) -->
@@ -164,6 +158,8 @@
         <div id="viewer-watching-state">
             <button id="btn-exit-watching" class="icon-button top-right-button">✕</button>
             <video id="remote-video" autoplay playsinline></video>
+            <!-- ビューアー側: カメラ切り替え操作 -->
+            <button id="btn-toggle-camera-viewer" class="icon-button bottom-right-button">🔄</button>
         </div>
     </div>
 
@@ -270,6 +266,7 @@
         // WebRTC・カメラ制御用変数
         let peer;
         let peerCall;
+        let dataConnection;
         let localStream;
         let currentFacingMode = 'environment';
         
@@ -444,8 +441,8 @@
         // ダブルクリックでブラックアウト(任意トグル)
         let clickCount = 0; let clickTimer;
         document.body.addEventListener('click', (e) => {
-            // モーダルや設定ボタン、YouTube/カメラ操作UIクリック時は除外
-            if (currentMode !== 'camera' || e.target.closest('#settings-modal') || e.target.closest('#btn-settings-open') || e.target.closest('#youtube-container') || e.target.closest('#camera-controls-overlay')) return;
+            // モーダルや設定ボタン、YouTubeコンテナクリック時は除外
+            if (currentMode !== 'camera' || e.target.closest('#settings-modal') || e.target.closest('#btn-settings-open') || e.target.closest('#youtube-container')) return;
             
             // 強制ブラックアウト状態(YouTube未設定＋ブラックアウト設定)の場合はトグルを無効化
             if (isForceBlackout && !document.getElementById('youtube-container').style.display.includes('block')) return;
@@ -503,6 +500,14 @@
                 if (call.metadata && call.metadata.password === viewerPin) {
                     statusEl.textContent = '接続中...';
                     call.answer(); 
+
+                    // カメラ側からのPeerIDを受け取り、DataConnectionを確立する
+                    if (call.metadata.cameraId) {
+                        dataConnection = peer.connect(call.metadata.cameraId);
+                        dataConnection.on('open', () => {
+                            console.log('カメラとのデータ接続確立');
+                        });
+                    }
 
                     call.on('stream', (remoteStream) => {
                         // 視聴画面へ切り替え
@@ -570,6 +575,16 @@
                 }
             });
 
+            // ビューアー側からのカメラ切り替え指示
+            document.getElementById('btn-toggle-camera-viewer').addEventListener('click', () => {
+                if (dataConnection && dataConnection.open) {
+                    dataConnection.send({ type: 'toggleCamera' });
+                    showToast('カメラ切り替えをリクエストしました');
+                } else {
+                    showToast('カメラとデータ接続されていません');
+                }
+            });
+
             finalDownloadLink.addEventListener('click', function() {
                 this.textContent = '保存しました！';
                 this.style.backgroundColor = '#6c757d';
@@ -586,13 +601,24 @@
             const guide = document.getElementById('swipe-guide');
             if(guide) guide.style.display = 'none';
 
-            // カメラ切り替えボタンを表示
-            document.getElementById('camera-controls-overlay').style.display = 'block';
-
             peer = new Peer();
             
-            // カメラストリームの取得と接続開始
-            getCameraStreamAndConnect(targetId, targetPw, currentFacingMode);
+            peer.on('open', () => {
+                // カメラストリームの取得と接続開始
+                getCameraStreamAndConnect(targetId, targetPw, currentFacingMode);
+            });
+
+            // ビューアーからのDataConnection（制御コマンド）を待ち受け
+            peer.on('connection', (conn) => {
+                conn.on('data', (data) => {
+                    if (data && data.type === 'toggleCamera') {
+                        const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+                        if (peerCall) {
+                            getCameraStreamAndConnect(peerCall.peer, peerCall.metadata.password, newFacingMode);
+                        }
+                    }
+                });
+            });
         }
 
         async function getCameraStreamAndConnect(targetId, targetPw, facingMode) {
@@ -619,8 +645,13 @@
                         showToast(`カメラを${facingMode === 'user' ? '前面' : '背面'}に切り替えました`);
                     }
                 } else {
-                    // 初回接続
-                    peerCall = peer.call(targetId, localStream, { metadata: { password: targetPw } });
+                    // 初回接続 (自身のPeerIDをビューアー側に伝える)
+                    peerCall = peer.call(targetId, localStream, { 
+                        metadata: { 
+                            password: targetPw,
+                            cameraId: peer.id 
+                        } 
+                    });
                     peerCall.on('error', (err) => console.error('接続エラー:', err));
                 }
 
@@ -628,20 +659,8 @@
             } catch (err) {
                 console.error('カメラ・マイクのアクセスエラー:', err);
                 alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザの権限を確認してください。');
-                document.getElementById('camera-controls-overlay').style.display = 'none'; 
             }
         }
-
-        // カメラ切り替えイベント
-        document.getElementById('btn-toggle-camera').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-            if (peerCall) {
-                getCameraStreamAndConnect(peerCall.peer, peerCall.metadata.password, newFacingMode);
-            } else {
-                showToast('カメラ接続の準備中です');
-            }
-        });
     </script>
 </body>
 </html>
