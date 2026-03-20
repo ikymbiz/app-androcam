@@ -33,70 +33,88 @@
         .news-time { font-size: 12px; color: #888; }
 
         /* 初回案内のオーバーレイ */
-        #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 8px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6; width: 80%; max-width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
+        #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 12px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6; width: 80%; max-width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.4);}
 
-        /* ビューアー画面 (新デザイン) */
-        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #1a1a1a; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
+        /* ビューアー画面 (モダン・クリーンUI) */
+        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
         
         /* 接続待機状態 */
-        #viewer-waiting-state { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; gap: 20px; padding: 20px; box-sizing: border-box; }
-        .viewer-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 15px; max-width: 400px; width: 95%; }
-        .guide-text { font-size: 15px; line-height: 1.6; text-align: center; color: #ddd; margin-bottom: 5px; font-weight: bold;}
-        #viewer-qrcode-container { padding: 20px; background-color: #fff; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.4);}
+        #viewer-waiting-state { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; gap: 30px; padding: 20px; box-sizing: border-box; }
+        .viewer-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px; max-width: 400px; width: 100%; background: rgba(255,255,255,0.05); padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
+        .guide-text { font-size: 15px; line-height: 1.6; text-align: center; color: #eee; margin: 0; font-weight: bold;}
+        #viewer-qrcode-container { padding: 20px; background-color: #fff; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);}
         #viewer-qrcode canvas { display: block; }
-        #viewer-status { font-size: 14px; color: #00d26a; font-weight: bold; margin: 0;}
-        .viewer-link-section { display: flex; align-items: center; background: #2a2a2a; padding: 12px 15px; border-radius: 30px; margin-top: 10px; width: 100%; border: 1px solid #444;}
-        #viewer-link-display { font-size: 12px; color: #aaa; word-break: break-all; flex-grow: 1; text-align: left; margin-right: 15px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;}
+        #viewer-status { font-size: 14px; color: #00d26a; font-weight: bold; margin: 0; letter-spacing: 1px;}
+        .viewer-link-section { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 8px 10px 8px 15px; border-radius: 30px; width: 100%; border: 1px solid rgba(255,255,255,0.1);}
+        #viewer-link-display { font-size: 13px; color: #ccc; word-break: break-all; text-align: left; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-right: 10px; }
         
         /* 映像視聴状態 */
         #viewer-watching-state { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative; }
         #remote-video { width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
         
         /* ボタン類共通 */
-        .icon-button { background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); color: white; font-size: 20px; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 120; backdrop-filter: blur(4px);}
+        .icon-button { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; font-size: 20px; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 120; backdrop-filter: blur(4px); transition: background 0.2s;}
+        .icon-button:active { background: rgba(255,255,255,0.2); }
         .top-right-button { position: absolute; top: 20px; right: 20px; }
-        .action-button { background-color: #dc3545; color: white; border: none; padding: 14px 28px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 120; transition: transform 0.1s; }
+        .action-button { background-color: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: transform 0.1s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
         .action-button:active { transform: scale(0.95); }
-        .bottom-center-button { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: max-content;}
-        #btn-copy-link { background-color: #007bff; padding: 8px 16px; font-size: 13px; border-radius: 20px; font-weight: bold;}
+        #btn-copy-link { padding: 8px 16px; font-size: 13px; border-radius: 20px; background: #0056b3; }
 
         /* スマホ保存用の最終画面 */
         #download-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #1a1a1a; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
-        #recorded-video { width: 90%; max-width: 400px; max-height: 40vh; background-color: #000; border: 2px solid #444; border-radius: 8px; margin-bottom: 15px; }
-        #btn-final-download { background-color: #28a745; color: white; padding: 16px 32px; border: none; border-radius: 30px; font-size: 18px; font-weight: bold; margin-bottom: 25px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-decoration: none; display: inline-block;}
-        #btn-back-home { background-color: #444; color: white; padding: 12px 24px; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; }
+        #recorded-video { width: 90%; max-width: 400px; max-height: 40vh; background-color: #000; border: 2px solid #444; border-radius: 12px; margin-bottom: 20px; }
+        #btn-final-download { background-color: #00d26a; color: #000; padding: 16px 32px; border: none; border-radius: 30px; font-size: 16px; font-weight: bold; margin-bottom: 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,210,106,0.3); text-decoration: none; display: inline-block; transition: transform 0.1s;}
+        #btn-final-download:active { transform: scale(0.95); }
+        #btn-back-home { background-color: transparent; color: #aaa; padding: 12px 24px; border: 1px solid #555; border-radius: 30px; font-size: 14px; cursor: pointer; transition: background 0.2s;}
+        #btn-back-home:active { background-color: rgba(255,255,255,0.1); }
 
         /* ブラックアウト画面 / YouTube 背景 */
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
-        #youtube-bg { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; z-index: 5; pointer-events: none; }
+        
+        #youtube-container { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 5; }
+        #youtube-player { width: 100%; height: 100%; pointer-events: none; } /* iframeでの直接タップを防ぐ */
+        
+        /* YouTube 操作用 UI */
+        .yt-controls { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 40px; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);}
+        .yt-controls.show { opacity: 1; pointer-events: auto; }
+        .yt-btn { background: rgba(255,255,255,0.15); border: none; color: white; font-size: 20px; cursor: pointer; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        .yt-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
+
         #my-video { display: none; }
 
         /* 設定モーダル */
-        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(3px);}
-        .modal-content { background: #fff; padding: 25px; border-radius: 16px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .modal-content h2 { margin: 0 0 5px 0; font-size: 22px; text-align: center;}
-        .modal-content label { display: flex; flex-direction: column; font-size: 14px; font-weight: bold; gap: 8px; color: #555;}
-        .modal-content label.checkbox-label { flex-direction: row; align-items: center; cursor: pointer; font-size: 15px;}
-        .modal-content input[type="text"] { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s;}
-        .modal-content input[type="text"]:focus { border-color: #007bff; }
-        .modal-content input[type="checkbox"] { width: 22px; height: 22px; accent-color: #007bff;}
-        .modal-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }
-        .modal-buttons button { flex: 1; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; border: none; cursor: pointer; transition: opacity 0.2s;}
-        .modal-buttons button:active { opacity: 0.8; }
+        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(5px);}
+        .modal-content { background: #fff; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 20px; color: #333; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .modal-content h2 { margin: 0; font-size: 20px; text-align: center; font-weight: bold;}
+        .modal-content label { display: flex; flex-direction: column; font-size: 13px; font-weight: bold; gap: 8px; color: #555;}
+        .modal-content label.checkbox-label { flex-direction: row; align-items: center; cursor: pointer; font-size: 14px;}
+        .modal-content input[type="text"] { padding: 14px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s; background: #f9f9f9;}
+        .modal-content input[type="text"]:focus { border-color: #007bff; background: #fff;}
+        .modal-content input[type="checkbox"] { width: 20px; height: 20px; accent-color: #007bff;}
+        .modal-buttons { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; }
+        .modal-buttons button { flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: bold; border: none; cursor: pointer; transition: transform 0.1s;}
+        .modal-buttons button:active { transform: scale(0.97); }
         .btn-primary { background: #007bff; color: white; }
-        .btn-secondary { background: #e0e0e0; color: #333; }
+        .btn-secondary { background: #f1f1f1; color: #333; }
 
         /* トースト通知 */
-        #toast { position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: bold; transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10000; pointer-events: none; white-space: nowrap;}
-        #toast.show { bottom: 30px; }
+        #toast { position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.9); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: bold; transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10000; pointer-events: none; white-space: nowrap; box-shadow: 0 5px 15px rgba(0,0,0,0.3); backdrop-filter: blur(5px);}
+        #toast.show { bottom: 40px; }
     </style>
 </head>
 <body class="mode-initial">
 
     <!-- カメラ側: 強制ブラックアウト用 -->
     <div id="black-overlay"></div>
-    <!-- カメラ側: YouTube再生用 -->
-    <iframe id="youtube-bg" allow="autoplay; encrypted-media"></iframe>
+    
+    <!-- カメラ側: YouTube再生用・操作UI -->
+    <div id="youtube-container">
+        <div id="youtube-player"></div>
+        <div id="youtube-controls" class="yt-controls">
+            <button id="yt-play-pause" class="yt-btn">⏸</button>
+            <button id="yt-mute-unmute" class="yt-btn">🔇</button>
+        </div>
+    </div>
 
     <!-- ニュースサイトモック (カメラ通常時) -->
     <div id="news-container">
@@ -129,7 +147,7 @@
                 </div>
                 <div class="viewer-link-section">
                     <span id="viewer-link-display">リンク生成中...</span>
-                    <button id="btn-copy-link" class="action-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px;">📋 コピー</button>
+                    <button id="btn-copy-link" class="action-button">📋 コピー</button>
                 </div>
             </div>
         </div>
@@ -138,15 +156,14 @@
         <div id="viewer-watching-state">
             <button id="btn-exit-watching" class="icon-button top-right-button">✕</button>
             <video id="remote-video" autoplay playsinline></video>
-            <button id="btn-save-exit" class="action-button bottom-center-button">⏹ 録画を終了して保存</button>
         </div>
     </div>
 
     <!-- ダウンロード画面 -->
     <div id="download-screen">
-        <h2 style="color: #00d26a; margin-bottom: 15px;">録画データが完成しました</h2>
+        <h2 style="color: #00d26a; margin-bottom: 15px; font-size: 22px;">録画データが完成しました</h2>
         <video id="recorded-video" controls playsinline></video>
-        <p style="color: #ffc107; font-size: 13px; margin-bottom: 25px; line-height: 1.5; font-weight: bold;">
+        <p style="color: #ffc107; font-size: 13px; margin-bottom: 25px; line-height: 1.6; font-weight: bold;">
             ※下のボタンで保存できない場合は<br><b>上の動画を長押しして「写真に追加」等</b><br>で直接保存してください。
         </p>
         <a id="btn-final-download" href="#" download>📥 スマホ本体に保存する</a>
@@ -245,7 +262,7 @@
         let peer;
         let currentMode = 'initial'; 
         let currentConnectionLink = '';
-        let isForceBlackout = false; // カメラ側強制ブラックアウトフラグ
+        let isForceBlackout = false;
         
         // ダミー記事生成
         const newsTitles = ["全国的に冷え込み強まる 明日にかけ積雪注意", "最新スマートフォンの売上高が過去最高を記録", "週末のイベント情報：各地でフェスティバル開催", "日経平均株価、一時300円超の値下がり", "スポーツ速報：日本代表が劇的な逆転勝利", "話題のAI技術、日常生活への導入が加速", "新種の海洋生物を発見、生態系の解明へ", "有名俳優の電撃結婚発表にSNS騒然", "来年度の税制改正案、ポイントを徹底解説", "人気のカフェチェーン、秋の新作メニュー公開"];
@@ -256,6 +273,72 @@
             item.innerHTML = `<div class="news-thumb">画像</div><div class="news-content"><div class="news-title">${newsTitles[i % newsTitles.length]}</div><div class="news-time">${Math.floor(Math.random() * 24)}時間前</div></div>`;
             dummyNewsContainer.appendChild(item);
         }
+
+        // --- YouTube API 関連 ---
+        let ytPlayer;
+        let isYtPlaying = true;
+        let isYtMuted = true;
+
+        function initYouTubePlayer(videoId) {
+            ytPlayer = new YT.Player('youtube-player', {
+                videoId: videoId,
+                playerVars: {
+                    'autoplay': 1,
+                    'controls': 0,
+                    'mute': 1,
+                    'playsinline': 1,
+                    'loop': 1,
+                    'playlist': videoId,
+                    'rel': 0
+                },
+                events: {
+                    'onReady': (event) => {
+                        event.target.playVideo();
+                    }
+                }
+            });
+        }
+
+        // UIイベント: YouTube操作
+        document.getElementById('yt-play-pause').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(!ytPlayer) return;
+            if (isYtPlaying) {
+                ytPlayer.pauseVideo();
+                document.getElementById('yt-play-pause').textContent = '▶️';
+            } else {
+                ytPlayer.playVideo();
+                document.getElementById('yt-play-pause').textContent = '⏸';
+            }
+            isYtPlaying = !isYtPlaying;
+        });
+
+        document.getElementById('yt-mute-unmute').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(!ytPlayer) return;
+            if (isYtMuted) {
+                ytPlayer.unMute();
+                document.getElementById('yt-mute-unmute').textContent = '🔊';
+            } else {
+                ytPlayer.mute();
+                document.getElementById('yt-mute-unmute').textContent = '🔇';
+            }
+            isYtMuted = !isYtMuted;
+        });
+
+        // カメラ画面のYouTube表示領域タップでUIをフェードイン
+        let ytControlsTimeout;
+        document.getElementById('youtube-container').addEventListener('click', (e) => {
+            if (e.target.closest('.yt-controls')) return; 
+            const controls = document.getElementById('youtube-controls');
+            controls.classList.toggle('show');
+            if(controls.classList.contains('show')) {
+                clearTimeout(ytControlsTimeout);
+                ytControlsTimeout = setTimeout(() => {
+                    controls.classList.remove('show');
+                }, 3500);
+            }
+        });
 
         // --- UI イベントリスナー ---
         
@@ -301,14 +384,27 @@
 
                 const newsContainer = document.getElementById('news-container');
                 const blackoutOverlay = document.getElementById('black-overlay');
-                const ytBg = document.getElementById('youtube-bg');
+                const ytContainer = document.getElementById('youtube-container');
 
                 if (ytId) {
                     newsContainer.style.display = 'none';
-                    ytBg.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=${ytId}`;
-                    ytBg.style.display = 'block';
+                    blackoutOverlay.style.display = 'none';
+                    ytContainer.style.display = 'block';
+
+                    // YouTube IFrame APIの動的読み込み
+                    if (typeof YT !== 'undefined' && YT.Player) {
+                        initYouTubePlayer(ytId);
+                    } else {
+                        window.onYouTubeIframeAPIReady = () => initYouTubePlayer(ytId);
+                        const tag = document.createElement('script');
+                        tag.src = "https://www.youtube.com/iframe_api";
+                        const firstScriptTag = document.getElementsByTagName('script')[0];
+                        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                    }
                 } else if (isForceBlackout) {
+                    // YouTubeURL未設定 かつ ブラックアウト有効
                     newsContainer.style.display = 'none';
+                    ytContainer.style.display = 'none';
                     blackoutOverlay.style.display = 'block';
                 }
                 
@@ -318,14 +414,14 @@
 
         // スワイプ判定 (初期モードのみ)
         let touchstartY = 0; let touchendY = 0;
-        const newsContainer = document.getElementById('news-container');
+        const newsContainerEl = document.getElementById('news-container');
 
-        newsContainer.addEventListener('touchstart', e => {
+        newsContainerEl.addEventListener('touchstart', e => {
             if (currentMode !== 'initial') return;
             touchstartY = e.changedTouches[0].screenY;
         }, {passive: true});
 
-        newsContainer.addEventListener('touchend', e => {
+        newsContainerEl.addEventListener('touchend', e => {
             if (currentMode !== 'initial') return;
             touchendY = e.changedTouches[0].screenY;
             if (touchendY - touchstartY > 80) startViewerMode();
@@ -334,9 +430,12 @@
         // ダブルクリックでブラックアウト(任意トグル)
         let clickCount = 0; let clickTimer;
         document.body.addEventListener('click', (e) => {
-            // モーダルや設定ボタンクリック時は除外
-            if (currentMode !== 'camera' || isForceBlackout || e.target.closest('#settings-modal') || e.target.closest('#btn-settings-open')) return;
+            // モーダルや設定ボタン、YouTubeコンテナクリック時は除外
+            if (currentMode !== 'camera' || e.target.closest('#settings-modal') || e.target.closest('#btn-settings-open') || e.target.closest('#youtube-container')) return;
             
+            // 強制ブラックアウト状態(YouTube未設定＋ブラックアウト設定)の場合はトグルを無効化
+            if (isForceBlackout && !document.getElementById('youtube-container').style.display.includes('block')) return;
+
             clickCount++;
             if (clickCount === 2) {
                 const overlay = document.getElementById('black-overlay');
@@ -367,7 +466,6 @@
 
             const videoEl = document.getElementById('remote-video');
             const statusEl = document.getElementById('viewer-status');
-            const saveExitBtn = document.getElementById('btn-save-exit');
             const downloadScreen = document.getElementById('download-screen');
             const finalDownloadLink = document.getElementById('btn-final-download');
             
@@ -412,6 +510,7 @@
                         mediaRecorder = new MediaRecorder(remoteStream, options);
                         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
                         
+                        // 録画停止時に自動でダウンロード画面へ
                         mediaRecorder.onstop = () => {
                             const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
                             const finalVideoUrl = URL.createObjectURL(blob);
@@ -447,22 +546,20 @@
 
             const resetApp = () => location.reload();
             document.getElementById('btn-close-viewer').addEventListener('click', resetApp);
+            
+            // 視聴終了時に自動で録画を止めて保存画面へ移行
             document.getElementById('btn-exit-watching').addEventListener('click', () => {
-                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-                else resetApp();
-            });
-
-            saveExitBtn.addEventListener('click', () => {
                 if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    saveExitBtn.textContent = 'データ生成中...';
-                    saveExitBtn.style.backgroundColor = '#6c757d';
                     mediaRecorder.stop(); 
+                } else {
+                    resetApp();
                 }
             });
 
             finalDownloadLink.addEventListener('click', function() {
                 this.textContent = '保存しました！';
                 this.style.backgroundColor = '#6c757d';
+                this.style.boxShadow = 'none';
             });
 
             document.getElementById('btn-back-home').addEventListener('click', resetApp);
