@@ -50,6 +50,8 @@
 
         /* ブラックアウト画面 */
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
+        
+        /* 隠しカメラ用要素 */
         #my-video { display: none; }
     </style>
 </head>
@@ -68,6 +70,11 @@
         
         <div class="news-list" id="dummy-news">
             </div>
+
+        <div id="swipe-guide">
+            👇 <b>下スワイプ</b>: 映像を見る(ビューアー)<br><br>
+            ※カメラとして使う場合は、スマホの標準カメラ等で<br>ビューアー側のQRコードを読み込んでください。
+        </div>
     </div>
 
     <div id="viewer-screen">
@@ -278,15 +285,6 @@
                     });
                 } else {
                     call.close();
-                }
-            });
-
-            videoEl.addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    if (videoEl.requestFullscreen) videoEl.requestFullscreen();
-                    else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
-                } else {
-                    if (document.exitFullscreen) document.exitFullscreen();
                 }
             });
         }
