@@ -655,7 +655,7 @@
                     if (videoSender) {
                         const newVideoTrack = localStream.getVideoTracks()[0];
                         await videoSender.replaceTrack(newVideoTrack);
-                        showToast(`カメラを${facingMode === 'user' ? '前面' : '背面'}に切り替えました`);
+                        //showToast(`カメラを${facingMode === 'user' ? '前面' : '背面'}に切り替えました`);
                     }
                 } else {
                     // 初回接続 (自身のPeerIDをビューアー側に伝える)
