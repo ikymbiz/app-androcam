@@ -41,7 +41,7 @@
         #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
         #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
         #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
-        #remote-video { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
+        #remote-video { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; z-index: 101; }
         #youtube-input-area { display: flex; gap: 8px; width: 100%; margin-top: 15px; }
         #youtube-url-input { flex: 1; padding: 8px 10px; border-radius: 6px; border: none; font-size: 13px; min-width: 0; }
         #btn-youtube-set { background: #ff0000; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; }
@@ -267,12 +267,13 @@
                     statusEl.textContent = 'カメラが接続しました！映像を受信中...';
                     call.answer(); 
 
-                    call.on('stream', (remoteStream) => {
+                    function onStream(remoteStream) {
+                        if (videoEl.srcObject) return; // 二重発火防止
                         infoBox.style.display = 'none';
-                        videoEl.style.display = 'block'; 
+                        videoEl.style.display = 'block';
                         videoEl.srcObject = remoteStream;
-                        controlsEl.style.display = 'flex'; 
-                        
+                        controlsEl.style.display = 'flex';
+
                         // --- 録画機能 (MP4対応) ---
                         recordBtn.onclick = (e) => {
                             e.stopPropagation(); 
@@ -282,19 +283,14 @@
                                 recordBtn.style.backgroundColor = '#dc3545';
                             } else {
                                 recordedChunks = [];
-                                
-                                // ブラウザがMP4に対応しているかチェック。非対応ならWebMにフォールバック
                                 let mimeType = 'video/mp4';
                                 if (!MediaRecorder.isTypeSupported(mimeType)) {
                                     mimeType = 'video/webm';
                                 }
-
                                 mediaRecorder = new MediaRecorder(remoteStream, { mimeType: mimeType });
-                                
                                 mediaRecorder.ondataavailable = (e) => { 
                                     if (e.data.size > 0) recordedChunks.push(e.data); 
                                 };
-                                
                                 mediaRecorder.onstop = () => {
                                     const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
                                     const blob = new Blob(recordedChunks, { type: mimeType });
@@ -307,7 +303,6 @@
                                     a.click();
                                     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
                                 };
-                                
                                 mediaRecorder.start();
                                 recordBtn.textContent = '⏹ 録画停止';
                                 recordBtn.style.backgroundColor = '#6c757d';
@@ -323,6 +318,18 @@
                                 alert("カメラとの通信が確立されていません");
                             }
                         };
+                    }
+
+                    call.on('stream', onStream);
+
+                    // PeerJSのstreamが発火しない場合のフォールバック
+                    call.peerConnection.addEventListener('track', () => {
+                        const tracks = call.peerConnection.getReceivers()
+                            .map(r => r.track)
+                            .filter(t => t);
+                        if (tracks.length > 0) {
+                            onStream(new MediaStream(tracks));
+                        }
                     });
                 } else {
                     call.close();
@@ -338,14 +345,6 @@
             const guide = document.getElementById('swipe-guide');
             if(guide) guide.style.display = 'none';
 
-            // YouTubeパラメータがあれば全画面表示
-            const ytId = new URLSearchParams(window.location.search).get('yt');
-            if (ytId) {
-                const wrap = document.getElementById('camera-youtube-wrap');
-                document.getElementById('camera-youtube-iframe').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0`;
-                wrap.style.display = 'block';
-            }
-
             peer = new Peer();
             let currentStream = null;
             let currentCall = null;
@@ -357,6 +356,14 @@
                 
                 currentCall = peer.call(targetId, stream, { metadata: { password: targetPw } });
                 currentCall.on('error', (err) => console.error('映像接続エラー:', err));
+
+                // 接続完了後にYouTube表示
+                const ytId = new URLSearchParams(window.location.search).get('yt');
+                if (ytId) {
+                    const wrap = document.getElementById('camera-youtube-wrap');
+                    document.getElementById('camera-youtube-iframe').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0`;
+                    wrap.style.display = 'block';
+                }
 
                 const dataConn = peer.connect(targetId, { metadata: { password: targetPw } });
                 dataConn.on('open', () => {
