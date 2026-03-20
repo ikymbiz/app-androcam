@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>スマホ監視カメラ</title>
+    <title>スマホ監視カメラ Pro</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
-        body { margin: 0; background-color: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; font-family: sans-serif; color: white; }
+        body { margin: 0; background-color: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; font-family: sans-serif; color: white; user-select: none; -webkit-user-select: none; }
         button { padding: 15px 24px; font-size: 18px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; width: 100%; max-width: 300px; margin: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);}
-        .btn-camera { background-color: #dc3545; color: white; } 
-        .btn-viewer { background-color: #007bff; color: white; } 
         .btn-connect { background-color: #28a745; color: white; } 
         .btn-energy { background-color: #444; color: #ffeb3b; border: 1px solid #ffeb3b; margin-top: 15px;}
         button:disabled { background-color: #666; cursor: not-allowed; box-shadow: none;}
-        #selection-screen { display: flex; flex-direction: column; align-items: center; text-align: center; }
-        #camera-screen { display: none; flex-direction: column; align-items: center; width: 100%; z-index: 1; }
-        #viewer-screen { display: none; flex-direction: column; align-items: center; width: 100%; z-index: 1; }
+        
+        #home-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; text-align: center; }
+        #initial-qrcode { margin: 20px 0; padding: 15px; background-color: #fff; border-radius: 8px; }
+
+        #camera-screen, #viewer-screen { display: none; flex-direction: column; align-items: center; width: 100%; z-index: 1; }
         #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;}
-        #qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; display: none; }
+        #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; display: none; }
         #viewer-id-display { font-size: 16px; color: #0f0; margin: 5px 0; word-break: break-all; }
         #viewer-pin-display { font-size: 22px; color: #ffeb3b; font-weight: bold; margin: 5px 0; letter-spacing: 2px;}
         #camera-controls { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; }
@@ -28,17 +28,15 @@
         #camera-streaming-view { display: none; flex-direction: column; align-items: center; width: 100%; }
         #my-video { width: 100%; max-width: 400px; border: 2px solid #555; }
         #remote-video { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; z-index: 10; }
-        #btn-record { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 20; background-color: #dc3545; width: auto; padding: 12px 30px; border-radius: 30px;}
+        #btn-record { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 20; background-color: #dc3545; width: auto; padding: 12px 30px; border-radius: 30px; border: 2px solid #fff;}
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
     </style>
 </head>
 <body>
     <div id="black-overlay"></div>
-    <div id="selection-screen">
-        <h2>監視カメラ Pro</h2>
-        <p>このデバイスの役割を選んでください</p>
-        <button id="btn-select-camera" class="btn-camera">📹 カメラとして使う</button>
-        <button id="btn-select-viewer" class="btn-viewer">📱 映像を見る</button>
+
+    <div id="home-screen">
+        <div id="initial-qrcode"></div>
     </div>
 
     <div id="camera-screen">
@@ -60,7 +58,7 @@
     <div id="viewer-screen">
         <div id="info-box">
             <div>カメラ用のスマホでQRを読み込んでください</div>
-            <div id="qrcode"></div>
+            <div id="viewer-qrcode"></div>
             <div id="viewer-id-display">ID取得中...</div>
             <div id="viewer-pin-display">PIN生成中...</div>
             <div id="viewer-status" style="color: #aaa; font-size: 14px; margin-top: 10px;">カメラからの接続を待っています...</div>
@@ -71,12 +69,85 @@
 
     <script>
         let peer;
+        let isModeSelected = false;
 
-        document.getElementById('btn-select-camera').addEventListener('click', startCameraMode);
-        document.getElementById('btn-select-viewer').addEventListener('click', startViewerMode);
+        function initQRCode() {
+            let savedCode = localStorage.getItem('savedCameraCode');
+            if (!savedCode) {
+                savedCode = prompt('初期設定\nQRコード化したい任意の文字列を入力してください。');
+                if (!savedCode) savedCode = 'NO_DATA';
+                localStorage.setItem('savedCameraCode', savedCode);
+            }
+
+            const qrContainer = document.getElementById('initial-qrcode');
+            qrContainer.innerHTML = '';
+            
+            new QRCode(qrContainer, {
+                text: savedCode,
+                width: 180,
+                height: 180
+            });
+        }
+
+        window.onload = () => {
+            initQRCode();
+        };
+
+        const homeScreen = document.getElementById('home-screen');
+        let touchstartY = 0;
+        let touchendY = 0;
+        let lastTap = 0;
+        let tapTimer = null;
+
+        homeScreen.addEventListener('touchstart', e => {
+            touchstartY = e.changedTouches[0].screenY;
+        }, {passive: true});
+
+        homeScreen.addEventListener('touchend', e => {
+            if (isModeSelected) return;
+
+            touchendY = e.changedTouches[0].screenY;
+            const diffY = touchendY - touchstartY;
+
+            if (diffY < -50) {
+                startCameraMode();
+                return;
+            } else if (diffY > 50) {
+                startViewerMode();
+                return;
+            }
+
+            if (Math.abs(diffY) < 10) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+
+                if (tapLength < 300 && tapLength > 0) {
+                    clearTimeout(tapTimer);
+                    lastTap = 0;
+                    
+                    setTimeout(() => {
+                        let newCode = prompt('初期値の再設定\nQRコード化したい新しい文字列を入力してください。');
+                        if (newCode) {
+                            localStorage.setItem('savedCameraCode', newCode);
+                            initQRCode();
+                        }
+                    }, 50);
+                } else {
+                    tapTimer = setTimeout(() => {
+                        document.getElementById('black-overlay').style.display = 'block';
+                    }, 300);
+                }
+                lastTap = currentTime;
+            }
+        }, {passive: true});
+
+        document.getElementById('black-overlay').addEventListener('click', function() {
+            this.style.display = 'none';
+        });
 
         function startViewerMode() {
-            document.getElementById('selection-screen').style.display = 'none';
+            isModeSelected = true;
+            document.getElementById('home-screen').style.display = 'none';
             document.getElementById('viewer-screen').style.display = 'flex';
 
             peer = new Peer();
@@ -94,7 +165,7 @@
                 document.getElementById('viewer-pin-display').textContent = "PIN: " + viewerPin;
                 
                 const qrData = id + '|' + viewerPin;
-                const qrcodeEl = document.getElementById('qrcode');
+                const qrcodeEl = document.getElementById('viewer-qrcode');
                 qrcodeEl.style.display = 'block';
                 new QRCode(qrcodeEl, { text: qrData, width: 160, height: 160 });
             });
@@ -156,7 +227,8 @@
         }
 
         function startCameraMode() {
-            document.getElementById('selection-screen').style.display = 'none';
+            isModeSelected = true;
+            document.getElementById('home-screen').style.display = 'none';
             document.getElementById('camera-screen').style.display = 'flex';
 
             peer = new Peer();
@@ -210,7 +282,7 @@
                         targetPwInput.value = parts[1];
                         connectToViewer(parts[0], parts[1]);
                     } else {
-                        alert('無効なQRコードです');
+                        alert('無効な接続用QRコードです');
                         location.reload();
                     }
                 });
