@@ -44,9 +44,12 @@
         /* 視聴中の保存・終了ボタン */
         #btn-save-exit { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; background-color: #dc3545; color: white; border: 2px solid #fff; width: auto; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);}
 
-        /* スマホ保存用の最終画面（セキュリティ対策） */
+        /* スマホ保存用の最終画面（確実な保存用） */
         #download-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
-        #btn-final-download { background-color: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 30px; font-size: 18px; font-weight: bold; margin-bottom: 20px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        #recorded-video { width: 90%; max-width: 400px; max-height: 40vh; background-color: #000; border: 2px solid #555; border-radius: 8px; margin-bottom: 10px; }
+        
+        /* ダウンロードボタンを本物のリンク(aタグ)としてデザイン */
+        #btn-final-download { background-color: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 30px; font-size: 18px; font-weight: bold; margin-bottom: 20px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); text-decoration: none; display: inline-block;}
         #btn-back-home { background-color: #555; color: white; padding: 12px 24px; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; }
 
         /* ブラックアウト画面 */
@@ -86,9 +89,14 @@
     </div>
 
     <div id="download-screen">
-        <h2 style="color: #0f0;">録画データが完成しました</h2>
-        <p style="color: #aaa; margin-bottom: 30px;">下のボタンを押すとスマホ本体に保存されます</p>
-        <button id="btn-final-download">📥 動画をスマホに保存する</button>
+        <h2 style="color: #0f0; margin-bottom: 10px;">録画データが完成しました</h2>
+        
+        <video id="recorded-video" controls playsinline></video>
+        <p style="color: #ffeb3b; font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+            ※下のボタンで保存できない場合は<br><b>上の動画を長押しして「写真に追加」等</b><br>で直接保存してください。
+        </p>
+
+        <a id="btn-final-download" href="#" download>📥 スマホ本体に保存する</a>
         <button id="btn-back-home">🔙 最初に戻る</button>
     </div>
 
@@ -188,12 +196,12 @@
             
             // 保存画面の要素
             const downloadScreen = document.getElementById('download-screen');
-            const finalDownloadBtn = document.getElementById('btn-final-download');
+            const finalDownloadLink = document.getElementById('btn-final-download');
+            const recordedVideoPlayer = document.getElementById('recorded-video');
             const backHomeBtn = document.getElementById('btn-back-home');
             
             let mediaRecorder;
             let recordedChunks = [];
-            let finalVideoUrl = null;
             let fileExt = 'mp4';
 
             peer.on('open', (id) => {
@@ -216,7 +224,7 @@
                         videoEl.srcObject = remoteStream;
                         saveExitBtn.style.display = 'block';
                         
-                        // --- 接続と同時に自動録画開始 ---
+                        // --- 自動録画開始 ---
                         recordedChunks = [];
                         let options = {};
                         if (MediaRecorder.isTypeSupported('video/mp4')) {
@@ -229,16 +237,24 @@
 
                         mediaRecorder = new MediaRecorder(remoteStream, options);
                         
+                        // データを定期的に保存
                         mediaRecorder.ondataavailable = (e) => {
                             if (e.data.size > 0) recordedChunks.push(e.data);
                         };
                         
-                        // 録画データ生成完了時
+                        // 録画停止時の処理
                         mediaRecorder.onstop = () => {
                             const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
-                            finalVideoUrl = URL.createObjectURL(blob);
+                            const finalVideoUrl = URL.createObjectURL(blob);
                             
-                            // ビューアーを隠して、保存専用画面を表示する
+                            // 1. 本物のダウンロードリンクにURLをセット
+                            finalDownloadLink.href = finalVideoUrl;
+                            finalDownloadLink.download = `camera_record_${new Date().getTime()}.${fileExt}`;
+                            
+                            // 2. 長押し保存用に動画プレーヤーにセット
+                            recordedVideoPlayer.src = finalVideoUrl;
+                            
+                            // 保存専用画面へ切り替え
                             document.getElementById('viewer-screen').style.display = 'none';
                             downloadScreen.style.display = 'flex';
                         };
@@ -250,7 +266,7 @@
                             const state = call.peerConnection.iceConnectionState;
                             if (state === 'disconnected' || state === 'failed' || state === 'closed') {
                                 if (mediaRecorder && mediaRecorder.state === 'recording') {
-                                    mediaRecorder.stop(); // これで自動的に保存画面へ移行します
+                                    mediaRecorder.stop();
                                 }
                             }
                         });
@@ -260,28 +276,19 @@
                 }
             });
 
-            // 「録画を終了して保存」ボタン（録画停止のトリガー）
+            // 「録画を終了して保存」ボタン
             saveExitBtn.addEventListener('click', () => {
                 if (mediaRecorder && mediaRecorder.state === 'recording') {
                     saveExitBtn.textContent = 'データ生成中...';
                     saveExitBtn.style.backgroundColor = '#6c757d';
-                    mediaRecorder.stop(); // これによりonstopが発火し、保存画面へ移行します
+                    mediaRecorder.stop(); 
                 }
             });
 
-            // スマホにダウンロード実行（セキュリティを突破する直接クリック）
-            finalDownloadBtn.addEventListener('click', () => {
-                if(!finalVideoUrl) return;
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = finalVideoUrl;
-                a.download = `camera_record_${new Date().getTime()}.${fileExt}`; 
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => document.body.removeChild(a), 100);
-                
-                finalDownloadBtn.textContent = '保存完了！';
-                finalDownloadBtn.style.backgroundColor = '#6c757d';
+            // ダウンロードリンクをクリックしたときの見た目変更
+            finalDownloadLink.addEventListener('click', function() {
+                this.textContent = '保存しました！';
+                this.style.backgroundColor = '#6c757d';
             });
 
             backHomeBtn.addEventListener('click', () => {
