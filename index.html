@@ -38,11 +38,15 @@
         #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
         
         /* ビューアーUI */
-        #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
+        #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; z-index: 110;}
         #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
         #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
         #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
         
+        /* 保存・終了ボタン */
+        #btn-save-exit { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; background-color: #28a745; color: white; border: 2px solid #fff; width: auto; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);}
+        #btn-fallback-save { display: none; margin-top: 15px; background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%;}
+
         /* ブラックアウト画面 */
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
         
@@ -62,9 +66,7 @@
         <div class="header-nav">
             <span class="active">主要</span><span>国内</span><span>国際</span><span>経済</span><span>エンタメ</span><span>スポーツ</span><span>IT</span>
         </div>
-        
-        <div class="news-list" id="dummy-news">
-        </div>
+        <div class="news-list" id="dummy-news"></div>
 
         <div id="swipe-guide">
             👇 <b>下スワイプ</b>: 映像を見る(ビューアー)<br><br>
@@ -78,19 +80,22 @@
             <div id="viewer-qrcode"></div>
             <div id="viewer-link-display">リンク生成中...</div>
             <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
+            
+            <button id="btn-fallback-save">📥 録画データを保存する</button>
         </div>
         <video id="remote-video" autoplay playsinline></video>
+        
+        <button id="btn-save-exit">⏹ 保存して終了</button>
     </div>
 
     <video id="my-video" autoplay muted playsinline></video>
 
     <script>
         let peer;
-        let currentMode = 'initial'; // 'initial', 'camera', 'viewer'
+        let currentMode = 'initial'; 
         
-        // ダミーニュースの生成
         const newsTitles = [
-            "全国的に冷え込み強まる 明日にかけ積雪注意！！", "最新スマートフォンの売上高が過去最高を記録", 
+            "全国的に冷え込み強まる！ 明日にかけ積雪注意", "最新スマートフォンの売上高が過去最高を記録", 
             "週末のイベント情報：各地でフェスティバル開催", "日経平均株価、一時300円超の値下がり",
             "スポーツ速報：日本代表が劇的な逆転勝利", "話題のAI技術、日常生活への導入が加速",
             "新種の海洋生物を発見、生態系の解明へ", "有名俳優の電撃結婚発表にSNS騒然",
@@ -100,17 +105,10 @@
         for (let i = 0; i < 20; i++) {
             const item = document.createElement('div');
             item.className = 'news-item';
-            item.innerHTML = `
-                <div class="news-thumb">画像</div>
-                <div class="news-content">
-                    <div class="news-title">${newsTitles[i % newsTitles.length]}</div>
-                    <div class="news-time">${Math.floor(Math.random() * 24)}時間前</div>
-                </div>
-            `;
+            item.innerHTML = `<div class="news-thumb">画像</div><div class="news-content"><div class="news-title">${newsTitles[i % newsTitles.length]}</div><div class="news-time">${Math.floor(Math.random() * 24)}時間前</div></div>`;
             dummyNewsContainer.appendChild(item);
         }
 
-        // --- 設定 (ベースURL) ---
         function getBaseUrl() {
             let url = localStorage.getItem('cameraBaseUrl');
             if (!url) {
@@ -130,7 +128,6 @@
             }
         });
 
-        // --- 初期ロード時のURLパラメータチェック ---
         window.onload = () => {
             setTimeout(() => {
                 const guide = document.getElementById('swipe-guide');
@@ -146,7 +143,6 @@
             }
         };
 
-        // --- スワイプ検知 ---
         let touchstartY = 0;
         let touchendY = 0;
         const newsContainer = document.getElementById('news-container');
@@ -159,14 +155,9 @@
         newsContainer.addEventListener('touchend', e => {
             if (currentMode !== 'initial') return;
             touchendY = e.changedTouches[0].screenY;
-            const diffY = touchendY - touchstartY;
-
-            if (diffY > 80) {
-                startViewerMode();
-            }
+            if (touchendY - touchstartY > 80) startViewerMode();
         }, {passive: true});
 
-        // --- ダブルタップ検知 ---
         let clickCount = 0;
         let clickTimer;
         newsContainer.addEventListener('click', () => {
@@ -198,16 +189,18 @@
             const videoEl = document.getElementById('remote-video');
             const infoBox = document.getElementById('info-box');
             const statusEl = document.getElementById('viewer-status');
+            const saveExitBtn = document.getElementById('btn-save-exit');
+            const fallbackSaveBtn = document.getElementById('btn-fallback-save');
             
             let mediaRecorder;
             let recordedChunks = [];
+            let finalVideoUrl = null;
+            let fileExt = 'mp4';
 
             peer.on('open', (id) => {
                 const baseUrl = getBaseUrl();
                 const connectionLink = `${baseUrl}?id=${id}&pin=${viewerPin}`;
-                
                 document.getElementById('viewer-link-display').textContent = connectionLink;
-                
                 const qrcodeEl = document.getElementById('viewer-qrcode');
                 qrcodeEl.innerHTML = '';
                 new QRCode(qrcodeEl, { text: connectionLink, width: 200, height: 200 });
@@ -215,22 +208,22 @@
 
             peer.on('call', (call) => {
                 if (call.metadata && call.metadata.password === viewerPin) {
-                    statusEl.textContent = 'カメラが接続しました！映像を受信中...';
+                    statusEl.textContent = '映像を受信中 (録画中)...';
                     call.answer(); 
 
                     call.on('stream', (remoteStream) => {
                         infoBox.style.display = 'none';
                         videoEl.style.display = 'block'; 
                         videoEl.srcObject = remoteStream;
+                        saveExitBtn.style.display = 'block';
                         
                         // --- 接続と同時に自動録画を開始 ---
                         recordedChunks = [];
                         let mimeType = 'video/mp4';
-                        
-                        // ブラウザがMP4に対応していない場合はWebMにフォールバック
                         if (!MediaRecorder.isTypeSupported(mimeType)) {
                             mimeType = 'video/webm';
                         }
+                        fileExt = mimeType.includes('mp4') ? 'mp4' : 'webm';
 
                         mediaRecorder = new MediaRecorder(remoteStream, { mimeType: mimeType });
                         
@@ -238,47 +231,78 @@
                             if (e.data.size > 0) recordedChunks.push(e.data);
                         };
                         
-                        // 録画停止時の保存処理
+                        // 録画停止時のデータ生成処理
                         mediaRecorder.onstop = () => {
-                            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
                             const blob = new Blob(recordedChunks, { type: mimeType });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = url;
-                            a.download = `camera_record_${new Date().getTime()}.${ext}`; 
-                            document.body.appendChild(a);
-                            a.click();
+                            finalVideoUrl = URL.createObjectURL(blob);
                             
-                            setTimeout(() => {
-                                document.body.removeChild(a);
-                                URL.revokeObjectURL(url);
-                            }, 100);
+                            // 保存して終了ボタン経由の場合は自動ダウンロードを試みる
+                            if (isManualStop) {
+                                triggerDownload();
+                                alert("録画データを保存しました。");
+                                location.reload(); // 最初に戻る
+                            } else {
+                                // カメラ側から突然切断された場合は、セキュリティ上自動ダウンロードできない事があるためボタンを表示
+                                videoEl.style.display = 'none';
+                                saveExitBtn.style.display = 'none';
+                                infoBox.style.display = 'flex';
+                                document.getElementById('viewer-qrcode').style.display = 'none';
+                                document.getElementById('viewer-link-display').style.display = 'none';
+                                statusEl.textContent = 'カメラの接続が切れました。';
+                                statusEl.style.color = '#ffeb3b';
+                                fallbackSaveBtn.style.display = 'block'; // 救済用手動保存ボタンを表示
+                            }
                         };
                         
-                        // 録画開始
+                        // 録画スタート
                         mediaRecorder.start();
 
-                        // --- カメラ切断時に録画を自動停止して保存 ---
-                        remoteStream.getTracks().forEach(track => {
-                            track.onended = () => {
+                        // 通信切断の検知 (カメラ側が閉じた時など)
+                        call.peerConnection.addEventListener('iceconnectionstatechange', () => {
+                            const state = call.peerConnection.iceConnectionState;
+                            if (state === 'disconnected' || state === 'failed' || state === 'closed') {
                                 if (mediaRecorder && mediaRecorder.state === 'recording') {
+                                    isManualStop = false;
                                     mediaRecorder.stop();
                                 }
-                            };
+                            }
                         });
                     });
-
-                    // Peer接続自体が閉じられた場合も録画停止
-                    call.on('close', () => {
-                        if (mediaRecorder && mediaRecorder.state === 'recording') {
-                            mediaRecorder.stop();
-                        }
-                    });
-
                 } else {
                     call.close();
                 }
+            });
+
+            let isManualStop = false;
+
+            // ダウンロード実行用の共通関数
+            function triggerDownload() {
+                if(!finalVideoUrl) return;
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = finalVideoUrl;
+                a.download = `camera_record_${new Date().getTime()}.${fileExt}`; 
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => document.body.removeChild(a), 100);
+            }
+
+            // 【手動】視聴中に保存して終了するボタン（これが一番確実です）
+            saveExitBtn.addEventListener('click', () => {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    isManualStop = true;
+                    saveExitBtn.textContent = '保存処理中...';
+                    saveExitBtn.style.backgroundColor = '#6c757d';
+                    mediaRecorder.stop(); // これによりonstopが発火し、ダウンロードされる
+                }
+            });
+
+            // 【救済】カメラ側が先に切れた時に表示される保存ボタン
+            fallbackSaveBtn.addEventListener('click', () => {
+                triggerDownload();
+                fallbackSaveBtn.textContent = '保存完了！';
+                fallbackSaveBtn.style.backgroundColor = '#6c757d';
+                setTimeout(() => location.reload(), 1500); // 1.5秒後に最初に戻る
             });
 
             videoEl.addEventListener('click', () => {
@@ -291,12 +315,11 @@
             });
         }
 
-        // --- カメラモード (バックグラウンド配信) ---
+        // --- カメラモード ---
         function startCameraMode(targetId, targetPw) {
             currentMode = 'camera';
             document.body.className = 'mode-camera'; 
             document.getElementById('news-container').style.display = 'flex';
-            
             const guide = document.getElementById('swipe-guide');
             if(guide) guide.style.display = 'none';
 
@@ -312,7 +335,7 @@
                     });
                 })
                 .catch((err) => {
-                    alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザのカメラ権限を確認してください。');
+                    alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザの権限を確認してください。');
                 });
         }
     </script>
