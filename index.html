@@ -3,25 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Y! ニュース</title>
+    <title>リモートカメラビューアー</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         /* 全体・リセット */
-        body, html { margin: 0; padding: 0; font-family: sans-serif; background-color: #f4f5f7; width: 100%; height: 100%; }
+        body, html { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f5f7; width: 100%; height: 100%; }
         * { box-sizing: border-box; }
         
         /* モードごとのスクロール制御 */
         body.mode-initial { overflow: hidden; touch-action: none; }
         body.mode-camera { overflow: auto; touch-action: auto; }
 
-        /* ニュースサイトのモックUI */
+        /* ニュースサイトのモックUI (カメラ側通常時) */
         #news-container { width: 100%; min-height: 100vh; background: #fff; display: flex; flex-direction: column; }
         .header { background-color: #ff0033; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; font-weight: bold; font-size: 20px;}
         .header-nav { display: flex; gap: 15px; background: #fff; padding: 10px 15px; border-bottom: 1px solid #ddd; overflow-x: auto; font-size: 14px; font-weight: bold; color: #555;}
         .header-nav span { white-space: nowrap; }
         .header-nav span.active { color: #ff0033; border-bottom: 2px solid #ff0033; padding-bottom: 5px; }
-        #btn-settings { font-size: 24px; cursor: pointer; }
+        #btn-settings-open { font-size: 24px; cursor: pointer; transition: transform 0.2s; }
+        #btn-settings-open:active { transform: scale(0.9); }
         
         /* ニュース記事リスト */
         .news-list { padding: 10px; flex-grow: 1; }
@@ -32,39 +33,76 @@
         .news-time { font-size: 12px; color: #888; }
 
         /* 初回案内のオーバーレイ */
-        #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 8px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6;}
+        #swipe-guide { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 8px; text-align: center; pointer-events: none; z-index: 50; transition: opacity 0.5s; line-height: 1.6; width: 80%; max-width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
 
-        /* ビューアー画面 */
-        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
-        #info-box { background: #333; padding: 20px; border-radius: 8px; text-align: center; width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; z-index: 110;}
-        #viewer-qrcode { margin: 15px 0; padding: 10px; background-color: #fff; border-radius: 4px; }
-        #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
-        #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
+        /* ビューアー画面 (新デザイン) */
+        #viewer-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #1a1a1a; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; overflow: hidden;}
         
-        /* 視聴中の保存・終了ボタン */
-        #btn-save-exit { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; background-color: #dc3545; color: white; border: 2px solid #fff; width: auto; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);}
-
-        /* スマホ保存用の最終画面（確実な保存用） */
-        #download-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #222; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
-        #recorded-video { width: 90%; max-width: 400px; max-height: 40vh; background-color: #000; border: 2px solid #555; border-radius: 8px; margin-bottom: 10px; }
+        /* 接続待機状態 */
+        #viewer-waiting-state { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; gap: 20px; padding: 20px; box-sizing: border-box; }
+        .viewer-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 15px; max-width: 400px; width: 95%; }
+        .guide-text { font-size: 15px; line-height: 1.6; text-align: center; color: #ddd; margin-bottom: 5px; font-weight: bold;}
+        #viewer-qrcode-container { padding: 20px; background-color: #fff; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.4);}
+        #viewer-qrcode canvas { display: block; }
+        #viewer-status { font-size: 14px; color: #00d26a; font-weight: bold; margin: 0;}
+        .viewer-link-section { display: flex; align-items: center; background: #2a2a2a; padding: 12px 15px; border-radius: 30px; margin-top: 10px; width: 100%; border: 1px solid #444;}
+        #viewer-link-display { font-size: 12px; color: #aaa; word-break: break-all; flex-grow: 1; text-align: left; margin-right: 15px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;}
         
-        /* ダウンロードボタンを本物のリンク(aタグ)としてデザイン */
-        #btn-final-download { background-color: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 30px; font-size: 18px; font-weight: bold; margin-bottom: 20px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); text-decoration: none; display: inline-block;}
-        #btn-back-home { background-color: #555; color: white; padding: 12px 24px; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; }
+        /* 映像視聴状態 */
+        #viewer-watching-state { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative; }
+        #remote-video { width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
+        
+        /* ボタン類共通 */
+        .icon-button { background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); color: white; font-size: 20px; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 120; backdrop-filter: blur(4px);}
+        .top-right-button { position: absolute; top: 20px; right: 20px; }
+        .action-button { background-color: #dc3545; color: white; border: none; padding: 14px 28px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 120; transition: transform 0.1s; }
+        .action-button:active { transform: scale(0.95); }
+        .bottom-center-button { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: max-content;}
+        #btn-copy-link { background-color: #007bff; padding: 8px 16px; font-size: 13px; border-radius: 20px; font-weight: bold;}
 
-        /* ブラックアウト画面 */
+        /* スマホ保存用の最終画面 */
+        #download-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #1a1a1a; color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
+        #recorded-video { width: 90%; max-width: 400px; max-height: 40vh; background-color: #000; border: 2px solid #444; border-radius: 8px; margin-bottom: 15px; }
+        #btn-final-download { background-color: #28a745; color: white; padding: 16px 32px; border: none; border-radius: 30px; font-size: 18px; font-weight: bold; margin-bottom: 25px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-decoration: none; display: inline-block;}
+        #btn-back-home { background-color: #444; color: white; padding: 12px 24px; border: none; border-radius: 30px; font-size: 16px; cursor: pointer; }
+
+        /* ブラックアウト画面 / YouTube 背景 */
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
+        #youtube-bg { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; z-index: 5; pointer-events: none; }
         #my-video { display: none; }
+
+        /* 設定モーダル */
+        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(3px);}
+        .modal-content { background: #fff; padding: 25px; border-radius: 16px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .modal-content h2 { margin: 0 0 5px 0; font-size: 22px; text-align: center;}
+        .modal-content label { display: flex; flex-direction: column; font-size: 14px; font-weight: bold; gap: 8px; color: #555;}
+        .modal-content label.checkbox-label { flex-direction: row; align-items: center; cursor: pointer; font-size: 15px;}
+        .modal-content input[type="text"] { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s;}
+        .modal-content input[type="text"]:focus { border-color: #007bff; }
+        .modal-content input[type="checkbox"] { width: 22px; height: 22px; accent-color: #007bff;}
+        .modal-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }
+        .modal-buttons button { flex: 1; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; border: none; cursor: pointer; transition: opacity 0.2s;}
+        .modal-buttons button:active { opacity: 0.8; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #e0e0e0; color: #333; }
+
+        /* トースト通知 */
+        #toast { position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: bold; transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10000; pointer-events: none; white-space: nowrap;}
+        #toast.show { bottom: 30px; }
     </style>
 </head>
 <body class="mode-initial">
 
+    <!-- カメラ側: 強制ブラックアウト用 -->
     <div id="black-overlay"></div>
+    <!-- カメラ側: YouTube再生用 -->
+    <iframe id="youtube-bg" allow="autoplay; encrypted-media"></iframe>
 
+    <!-- ニュースサイトモック (カメラ通常時) -->
     <div id="news-container">
         <div class="header">
             <span>Y! ニュース</span>
-            <span id="btn-settings">⚙️</span>
+            <span id="btn-settings-open">⚙️</span>
         </div>
         <div class="header-nav">
             <span class="active">主要</span><span>国内</span><span>国際</span><span>経済</span><span>エンタメ</span><span>スポーツ</span><span>IT</span>
@@ -73,38 +111,141 @@
 
         <div id="swipe-guide">
             👇 <b>下スワイプ</b>: 映像を見る(ビューアー)<br><br>
-            ※カメラとして使う場合は、スマホの標準カメラ等で<br>ビューアー側のQRコードを読み込んでください。
+            ※カメラとして使う場合は、スマホの標準カメラ等でビューアー側のQRコードを読み込んでください。
         </div>
     </div>
 
+    <!-- ビューアー画面 -->
     <div id="viewer-screen">
-        <div id="info-box">
-            <div>カメラ端末でQRコードを読み込むと<br>自動で接続・配信が始まります</div>
-            <div id="viewer-qrcode"></div>
-            <div id="viewer-link-display">リンク生成中...</div>
-            <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
+        <!-- 接続待機コンテナ -->
+        <div id="viewer-waiting-state">
+            <button id="btn-close-viewer" class="icon-button top-right-button">✕</button>
+
+            <div class="viewer-content-wrapper">
+                <p class="guide-text">カメラ端末でQRコードを読み込むと<br>自動で接続・配信が始まります</p>
+                <div id="viewer-qrcode-container">
+                    <div id="viewer-qrcode"></div>
+                    <p id="viewer-status">接続待機中...</p>
+                </div>
+                <div class="viewer-link-section">
+                    <span id="viewer-link-display">リンク生成中...</span>
+                    <button id="btn-copy-link" class="action-button" style="padding: 8px 16px; border-radius: 20px; font-size: 13px;">📋 コピー</button>
+                </div>
+            </div>
         </div>
-        <video id="remote-video" autoplay playsinline></video>
-        <button id="btn-save-exit">⏹ 録画を終了して保存</button>
+
+        <!-- 映像視聴コンテナ -->
+        <div id="viewer-watching-state">
+            <button id="btn-exit-watching" class="icon-button top-right-button">✕</button>
+            <video id="remote-video" autoplay playsinline></video>
+            <button id="btn-save-exit" class="action-button bottom-center-button">⏹ 録画を終了して保存</button>
+        </div>
     </div>
 
+    <!-- ダウンロード画面 -->
     <div id="download-screen">
-        <h2 style="color: #0f0; margin-bottom: 10px;">録画データが完成しました</h2>
-        
+        <h2 style="color: #00d26a; margin-bottom: 15px;">録画データが完成しました</h2>
         <video id="recorded-video" controls playsinline></video>
-        <p style="color: #ffeb3b; font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+        <p style="color: #ffc107; font-size: 13px; margin-bottom: 25px; line-height: 1.5; font-weight: bold;">
             ※下のボタンで保存できない場合は<br><b>上の動画を長押しして「写真に追加」等</b><br>で直接保存してください。
         </p>
-
         <a id="btn-final-download" href="#" download>📥 スマホ本体に保存する</a>
         <button id="btn-back-home">🔙 最初に戻る</button>
     </div>
 
+    <!-- 設定モーダル -->
+    <div id="settings-modal">
+        <div class="modal-content">
+            <h2>設定</h2>
+            <label>
+                ベースURL (QRコードの遷移先):
+                <input type="text" id="setting-base-url">
+            </label>
+            <label>
+                YouTube URL (カメラ側表示用):
+                <input type="text" id="setting-yt-url" placeholder="https://youtube.com/watch?v=...">
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="setting-blackout">
+                YouTube未設定時は画面を真っ黒にする
+            </label>
+            <div class="modal-buttons">
+                <button id="btn-close-settings" class="btn-secondary">キャンセル</button>
+                <button id="btn-save-settings" class="btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast">設定を保存しました</div>
+
+    <!-- カメラ用非表示ビデオ -->
     <video id="my-video" autoplay muted playsinline></video>
 
     <script>
+        // --- IndexedDB ユーティリティ ---
+        const DB_NAME = 'WebRTCCameraDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'settings';
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getSetting(key, defaultValue) {
+            try {
+                const db = await initDB();
+                return new Promise((resolve) => {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const store = tx.objectStore(STORE_NAME);
+                    const req = store.get(key);
+                    req.onsuccess = () => resolve(req.result !== undefined ? req.result : defaultValue);
+                    req.onerror = () => resolve(defaultValue);
+                });
+            } catch (e) {
+                return defaultValue;
+            }
+        }
+
+        async function setSetting(key, value) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.put(value, key);
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        // --- 共通ユーティリティ ---
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function extractYouTubeID(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
         let peer;
         let currentMode = 'initial'; 
+        let currentConnectionLink = '';
+        let isForceBlackout = false; // カメラ側強制ブラックアウトフラグ
         
         // ダミー記事生成
         const newsTitles = ["全国的に冷え込み強まる 明日にかけ積雪注意", "最新スマートフォンの売上高が過去最高を記録", "週末のイベント情報：各地でフェスティバル開催", "日経平均株価、一時300円超の値下がり", "スポーツ速報：日本代表が劇的な逆転勝利", "話題のAI技術、日常生活への導入が加速", "新種の海洋生物を発見、生態系の解明へ", "有名俳優の電撃結婚発表にSNS騒然", "来年度の税制改正案、ポイントを徹底解説", "人気のカフェチェーン、秋の新作メニュー公開"];
@@ -116,25 +257,31 @@
             dummyNewsContainer.appendChild(item);
         }
 
-        function getBaseUrl() {
-            let url = localStorage.getItem('cameraBaseUrl');
-            if (!url) {
-                url = window.location.href.split('?')[0];
-                localStorage.setItem('cameraBaseUrl', url);
-            }
-            return url;
-        }
-
-        document.getElementById('btn-settings').addEventListener('click', () => {
+        // --- UI イベントリスナー ---
+        
+        // 設定モーダル制御
+        const modal = document.getElementById('settings-modal');
+        document.getElementById('btn-settings-open').addEventListener('click', async () => {
             if (currentMode !== 'initial') return; 
-            let currentUrl = getBaseUrl();
-            let newUrl = prompt('QRコードの遷移先(ベースURL)を設定してください。\n※インターネット上にアップロードしたURLを入力してください。', currentUrl);
-            if (newUrl && newUrl.trim() !== '') {
-                localStorage.setItem('cameraBaseUrl', newUrl.trim());
-                alert('設定を保存しました。');
-            }
+            document.getElementById('setting-base-url').value = await getSetting('cameraBaseUrl', window.location.href.split('?')[0]);
+            document.getElementById('setting-yt-url').value = await getSetting('youtubeUrl', '');
+            document.getElementById('setting-blackout').checked = await getSetting('blackoutEnabled', false);
+            modal.style.display = 'flex';
         });
 
+        document.getElementById('btn-close-settings').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        document.getElementById('btn-save-settings').addEventListener('click', async () => {
+            await setSetting('cameraBaseUrl', document.getElementById('setting-base-url').value.trim());
+            await setSetting('youtubeUrl', document.getElementById('setting-yt-url').value.trim());
+            await setSetting('blackoutEnabled', document.getElementById('setting-blackout').checked);
+            modal.style.display = 'none';
+            showToast('設定を保存しました');
+        });
+
+        // 起動処理
         window.onload = () => {
             setTimeout(() => {
                 const guide = document.getElementById('swipe-guide');
@@ -144,10 +291,32 @@
             const urlParams = new URLSearchParams(window.location.search);
             const targetId = urlParams.get('id');
             const targetPin = urlParams.get('pin');
+            const ytParam = urlParams.get('yt');
+            const boParam = urlParams.get('bo');
 
-            if (targetId && targetPin) startCameraMode(targetId, targetPin);
+            if (targetId && targetPin) {
+                // カメラ側起動時の画面制御
+                const ytId = ytParam ? extractYouTubeID(decodeURIComponent(ytParam)) : null;
+                isForceBlackout = (boParam === '1');
+
+                const newsContainer = document.getElementById('news-container');
+                const blackoutOverlay = document.getElementById('black-overlay');
+                const ytBg = document.getElementById('youtube-bg');
+
+                if (ytId) {
+                    newsContainer.style.display = 'none';
+                    ytBg.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=${ytId}`;
+                    ytBg.style.display = 'block';
+                } else if (isForceBlackout) {
+                    newsContainer.style.display = 'none';
+                    blackoutOverlay.style.display = 'block';
+                }
+                
+                startCameraMode(targetId, targetPin);
+            }
         };
 
+        // スワイプ判定 (初期モードのみ)
         let touchstartY = 0; let touchendY = 0;
         const newsContainer = document.getElementById('news-container');
 
@@ -162,12 +331,16 @@
             if (touchendY - touchstartY > 80) startViewerMode();
         }, {passive: true});
 
+        // ダブルクリックでブラックアウト(任意トグル)
         let clickCount = 0; let clickTimer;
-        newsContainer.addEventListener('click', () => {
-            if (currentMode !== 'camera') return;
+        document.body.addEventListener('click', (e) => {
+            // モーダルや設定ボタンクリック時は除外
+            if (currentMode !== 'camera' || isForceBlackout || e.target.closest('#settings-modal') || e.target.closest('#btn-settings-open')) return;
+            
             clickCount++;
             if (clickCount === 2) {
-                document.getElementById('black-overlay').style.display = 'block';
+                const overlay = document.getElementById('black-overlay');
+                overlay.style.display = overlay.style.display === 'block' ? 'none' : 'block';
                 clickCount = 0;
                 clearTimeout(clickTimer);
             } else {
@@ -175,56 +348,57 @@
             }
         });
 
-        document.getElementById('black-overlay').addEventListener('click', function() {
-            this.style.display = 'none';
-        });
-
         // --- ビューアーモード ---
-        function startViewerMode() {
+        async function startViewerMode() {
             currentMode = 'viewer';
             document.body.className = ''; 
             document.getElementById('news-container').style.display = 'none';
             document.getElementById('viewer-screen').style.display = 'flex';
+            document.getElementById('viewer-waiting-state').style.display = 'flex';
+            document.getElementById('viewer-watching-state').style.display = 'none';
+
+            // 設定の取得
+            const baseUrl = await getSetting('cameraBaseUrl', window.location.href.split('?')[0]);
+            const ytUrl = await getSetting('youtubeUrl', '');
+            const blackout = await getSetting('blackoutEnabled', false);
 
             peer = new Peer();
             const viewerPin = Math.floor(100000 + Math.random() * 900000).toString(); 
 
             const videoEl = document.getElementById('remote-video');
-            const infoBox = document.getElementById('info-box');
             const statusEl = document.getElementById('viewer-status');
             const saveExitBtn = document.getElementById('btn-save-exit');
-            
-            // 保存画面の要素
             const downloadScreen = document.getElementById('download-screen');
             const finalDownloadLink = document.getElementById('btn-final-download');
-            const recordedVideoPlayer = document.getElementById('recorded-video');
-            const backHomeBtn = document.getElementById('btn-back-home');
             
             let mediaRecorder;
             let recordedChunks = [];
             let fileExt = 'mp4';
 
             peer.on('open', (id) => {
-                const baseUrl = getBaseUrl();
-                const connectionLink = `${baseUrl}?id=${id}&pin=${viewerPin}`;
-                document.getElementById('viewer-link-display').textContent = connectionLink;
+                // 設定をURLパラメータにエンコードして含める
+                const ytParam = ytUrl ? `&yt=${encodeURIComponent(ytUrl)}` : '';
+                const boParam = blackout ? '&bo=1' : '&bo=0';
+                currentConnectionLink = `${baseUrl}?id=${id}&pin=${viewerPin}${ytParam}${boParam}`;
+                
+                document.getElementById('viewer-link-display').textContent = currentConnectionLink;
                 const qrcodeEl = document.getElementById('viewer-qrcode');
                 qrcodeEl.innerHTML = '';
-                new QRCode(qrcodeEl, { text: connectionLink, width: 200, height: 200 });
+                new QRCode(qrcodeEl, { text: currentConnectionLink, width: 220, height: 220, colorDark: "#1a1a1a" });
             });
 
             peer.on('call', (call) => {
                 if (call.metadata && call.metadata.password === viewerPin) {
-                    statusEl.textContent = '映像を受信中 (録画中)...';
+                    statusEl.textContent = '接続中...';
                     call.answer(); 
 
                     call.on('stream', (remoteStream) => {
-                        infoBox.style.display = 'none';
-                        videoEl.style.display = 'block'; 
+                        // 視聴画面へ切り替え
+                        document.getElementById('viewer-waiting-state').style.display = 'none';
+                        document.getElementById('viewer-watching-state').style.display = 'flex';
                         videoEl.srcObject = remoteStream;
-                        saveExitBtn.style.display = 'block';
                         
-                        // --- 自動録画開始 ---
+                        // 自動録画開始
                         recordedChunks = [];
                         let options = {};
                         if (MediaRecorder.isTypeSupported('video/mp4')) {
@@ -236,38 +410,25 @@
                         }
 
                         mediaRecorder = new MediaRecorder(remoteStream, options);
+                        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
                         
-                        // データを定期的に保存
-                        mediaRecorder.ondataavailable = (e) => {
-                            if (e.data.size > 0) recordedChunks.push(e.data);
-                        };
-                        
-                        // 録画停止時の処理
                         mediaRecorder.onstop = () => {
                             const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
                             const finalVideoUrl = URL.createObjectURL(blob);
                             
-                            // 1. 本物のダウンロードリンクにURLをセット
                             finalDownloadLink.href = finalVideoUrl;
                             finalDownloadLink.download = `camera_record_${new Date().getTime()}.${fileExt}`;
+                            document.getElementById('recorded-video').src = finalVideoUrl;
                             
-                            // 2. 長押し保存用に動画プレーヤーにセット
-                            recordedVideoPlayer.src = finalVideoUrl;
-                            
-                            // 保存専用画面へ切り替え
                             document.getElementById('viewer-screen').style.display = 'none';
                             downloadScreen.style.display = 'flex';
                         };
-                        
                         mediaRecorder.start();
 
-                        // 通信切断の検知
                         call.peerConnection.addEventListener('iceconnectionstatechange', () => {
                             const state = call.peerConnection.iceConnectionState;
                             if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-                                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                                    mediaRecorder.stop();
-                                }
+                                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
                             }
                         });
                     });
@@ -276,7 +437,21 @@
                 }
             });
 
-            // 「録画を終了して保存」ボタン
+            // ビューアーUIボタンのイベント
+            document.getElementById('btn-copy-link').addEventListener('click', () => {
+                if(currentConnectionLink) {
+                    navigator.clipboard.writeText(currentConnectionLink);
+                    showToast('リンクをコピーしました');
+                }
+            });
+
+            const resetApp = () => location.reload();
+            document.getElementById('btn-close-viewer').addEventListener('click', resetApp);
+            document.getElementById('btn-exit-watching').addEventListener('click', () => {
+                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+                else resetApp();
+            });
+
             saveExitBtn.addEventListener('click', () => {
                 if (mediaRecorder && mediaRecorder.state === 'recording') {
                     saveExitBtn.textContent = 'データ生成中...';
@@ -285,31 +460,18 @@
                 }
             });
 
-            // ダウンロードリンクをクリックしたときの見た目変更
             finalDownloadLink.addEventListener('click', function() {
                 this.textContent = '保存しました！';
                 this.style.backgroundColor = '#6c757d';
             });
 
-            backHomeBtn.addEventListener('click', () => {
-                location.reload();
-            });
-
-            videoEl.addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    if (videoEl.requestFullscreen) videoEl.requestFullscreen();
-                    else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
-                } else {
-                    if (document.exitFullscreen) document.exitFullscreen();
-                }
-            });
+            document.getElementById('btn-back-home').addEventListener('click', resetApp);
         }
 
         // --- カメラモード ---
         function startCameraMode(targetId, targetPw) {
             currentMode = 'camera';
             document.body.className = 'mode-camera'; 
-            document.getElementById('news-container').style.display = 'flex';
             const guide = document.getElementById('swipe-guide');
             if(guide) guide.style.display = 'none';
 
@@ -319,10 +481,7 @@
                 .then((stream) => {
                     document.getElementById('my-video').srcObject = stream;
                     const call = peer.call(targetId, stream, { metadata: { password: targetPw } });
-                    
-                    call.on('error', (err) => {
-                        console.error('接続エラー:', err);
-                    });
+                    call.on('error', (err) => console.error('接続エラー:', err));
                 })
                 .catch((err) => {
                     alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザの権限を確認してください。');
