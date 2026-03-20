@@ -43,10 +43,8 @@
         #viewer-link-display { font-size: 12px; color: #aaa; margin: 10px 0; word-break: break-all; background: #222; padding: 8px; border-radius: 4px;}
         #remote-video { display: none; width: 100vw; height: 100vh; background-color: #000; object-fit: contain; }
         
-        /* ビューアー操作ボタン群 */
-        #viewer-controls { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; gap: 15px; width: 90%; justify-content: center;}
-        .btn-viewer { background-color: #dc3545; color: white; border: 2px solid #fff; padding: 12px 20px; border-radius: 30px; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;}
-        #btn-switch-cam { background-color: #007bff; } /* 切り替えボタンは青色 */
+        /* 録画ボタン */
+        #btn-record { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 120; background-color: #dc3545; color: white; border: 2px solid #fff; width: auto; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);}
 
         /* ブラックアウト画面 */
         #black-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; }
@@ -85,20 +83,16 @@
             <div id="viewer-status" style="color: #0f0; font-size: 16px; margin-top: 10px; font-weight: bold;">接続待機中...</div>
         </div>
         <video id="remote-video" autoplay playsinline></video>
-        
-        <div id="viewer-controls">
-            <button id="btn-switch-cam" class="btn-viewer">🔄 カメラ切替</button>
-            <button id="btn-record" class="btn-viewer">🔴 録画開始</button>
-        </div>
+        <button id="btn-record">🔴 録画開始</button>
     </div>
 
     <video id="my-video" autoplay muted playsinline></video>
 
     <script>
         let peer;
-        let currentMode = 'initial';
+        let currentMode = 'initial'; // 'initial', 'camera', 'viewer'
         
-        // ダミーニュース生成
+        // ダミーニュースの生成
         const newsTitles = [
             "全国的に冷え込み強まる 明日にかけ積雪注意", "最新スマートフォンの売上高が過去最高を記録", 
             "週末のイベント情報：各地でフェスティバル開催", "日経平均株価、一時300円超の値下がり",
@@ -110,11 +104,17 @@
         for (let i = 0; i < 20; i++) {
             const item = document.createElement('div');
             item.className = 'news-item';
-            item.innerHTML = `<div class="news-thumb">画像</div><div class="news-content"><div class="news-title">${newsTitles[i % newsTitles.length]}</div><div class="news-time">${Math.floor(Math.random() * 24)}時間前</div></div>`;
+            item.innerHTML = `
+                <div class="news-thumb">画像</div>
+                <div class="news-content">
+                    <div class="news-title">${newsTitles[i % newsTitles.length]}</div>
+                    <div class="news-time">${Math.floor(Math.random() * 24)}時間前</div>
+                </div>
+            `;
             dummyNewsContainer.appendChild(item);
         }
 
-        // ベースURL管理
+        // --- 設定 (ベースURL) ---
         function getBaseUrl() {
             let url = localStorage.getItem('cameraBaseUrl');
             if (!url) {
@@ -134,7 +134,8 @@
             }
         });
 
-        // 初期ロード時判定
+        // --- ★重要★ 初期ロード時のURLパラメータチェック ---
+        // スマホの標準カメラ等でQRを読んでアクセスした際、ここに引っかかって自動でカメラになります
         window.onload = () => {
             setTimeout(() => {
                 const guide = document.getElementById('swipe-guide');
@@ -145,12 +146,13 @@
             const targetId = urlParams.get('id');
             const targetPin = urlParams.get('pin');
 
+            // URLに接続用のパラメータが含まれていたら、即座にカメラモードを起動
             if (targetId && targetPin) {
                 startCameraMode(targetId, targetPin);
             }
         };
 
-        // スワイプ検知
+        // --- スワイプ検知 ---
         let touchstartY = 0;
         let touchendY = 0;
         const newsContainer = document.getElementById('news-container');
@@ -163,10 +165,15 @@
         newsContainer.addEventListener('touchend', e => {
             if (currentMode !== 'initial') return;
             touchendY = e.changedTouches[0].screenY;
-            if (touchendY - touchstartY > 80) startViewerMode();
+            const diffY = touchendY - touchstartY;
+
+            // 下スワイプのみ検知（ビューアー起動）
+            if (diffY > 80) {
+                startViewerMode();
+            }
         }, {passive: true});
 
-        // ダブルタップ検知
+        // --- ダブルタップ検知 ---
         let clickCount = 0;
         let clickTimer;
         newsContainer.addEventListener('click', () => {
@@ -198,31 +205,22 @@
             const videoEl = document.getElementById('remote-video');
             const infoBox = document.getElementById('info-box');
             const statusEl = document.getElementById('viewer-status');
-            const controlsEl = document.getElementById('viewer-controls');
             const recordBtn = document.getElementById('btn-record');
-            const switchBtn = document.getElementById('btn-switch-cam');
             
             let mediaRecorder;
             let recordedChunks = [];
-            let currentDataConn = null; // カメラ側への命令送信用
 
             peer.on('open', (id) => {
                 const baseUrl = getBaseUrl();
                 const connectionLink = `${baseUrl}?id=${id}&pin=${viewerPin}`;
+                
                 document.getElementById('viewer-link-display').textContent = connectionLink;
+                
                 const qrcodeEl = document.getElementById('viewer-qrcode');
                 qrcodeEl.innerHTML = '';
                 new QRCode(qrcodeEl, { text: connectionLink, width: 200, height: 200 });
             });
 
-            // データ通信の受信（カメラから接続されたとき）
-            peer.on('connection', (conn) => {
-                if (conn.metadata && conn.metadata.password === viewerPin) {
-                    currentDataConn = conn;
-                }
-            });
-
-            // 映像の受信
             peer.on('call', (call) => {
                 if (call.metadata && call.metadata.password === viewerPin) {
                     statusEl.textContent = 'カメラが接続しました！映像を受信中...';
@@ -232,9 +230,9 @@
                         infoBox.style.display = 'none';
                         videoEl.style.display = 'block'; 
                         videoEl.srcObject = remoteStream;
-                        controlsEl.style.display = 'flex'; // ボタン群を表示
                         
-                        // --- 録画機能 ---
+                        recordBtn.style.display = 'block';
+                        
                         recordBtn.onclick = (e) => {
                             e.stopPropagation(); 
                             if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -244,7 +242,11 @@
                             } else {
                                 recordedChunks = [];
                                 mediaRecorder = new MediaRecorder(remoteStream);
-                                mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                                
+                                mediaRecorder.ondataavailable = (e) => {
+                                    if (e.data.size > 0) recordedChunks.push(e.data);
+                                };
+                                
                                 mediaRecorder.onstop = () => {
                                     const blob = new Blob(recordedChunks, { type: 'video/webm' });
                                     const url = URL.createObjectURL(blob);
@@ -254,22 +256,16 @@
                                     a.download = `camera_record_${new Date().getTime()}.webm`; 
                                     document.body.appendChild(a);
                                     a.click();
-                                    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+                                    
+                                    setTimeout(() => {
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(url);
+                                    }, 100);
                                 };
+                                
                                 mediaRecorder.start();
                                 recordBtn.textContent = '⏹ 録画停止';
                                 recordBtn.style.backgroundColor = '#6c757d';
-                            }
-                        };
-
-                        // --- カメラ切り替え命令送信 ---
-                        switchBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            if (currentDataConn && currentDataConn.open) {
-                                // カメラ側に切り替えコマンドを送信
-                                currentDataConn.send({ command: 'switch_camera' });
-                            } else {
-                                alert("カメラとの通信が確立されていません");
                             }
                         };
                     });
@@ -293,70 +289,23 @@
             currentMode = 'camera';
             document.body.className = 'mode-camera'; 
             document.getElementById('news-container').style.display = 'flex';
+            
             const guide = document.getElementById('swipe-guide');
             if(guide) guide.style.display = 'none';
 
             peer = new Peer();
-            let currentStream = null;
-            let currentCall = null;
-            let isFrontCamera = false; // 初期値は外カメラ(背面)
 
-            // ビューアーへ映像とデータを接続する処理
-            function connectToViewer(stream) {
-                currentStream = stream;
-                document.getElementById('my-video').srcObject = stream;
-                
-                // 映像接続
-                currentCall = peer.call(targetId, stream, { metadata: { password: targetPw } });
-                currentCall.on('error', (err) => console.error('映像接続エラー:', err));
-
-                // データ通信接続（切り替え命令を受け取るため）
-                const dataConn = peer.connect(targetId, { metadata: { password: targetPw } });
-                dataConn.on('open', () => {
-                    dataConn.on('data', (data) => {
-                        if (data.command === 'switch_camera') {
-                            switchCamera();
-                        }
-                    });
-                });
-            }
-
-            // カメラの向きを反転してトラックを差し替える関数
-            function switchCamera() {
-                isFrontCamera = !isFrontCamera;
-                const facingMode = isFrontCamera ? 'user' : 'environment';
-
-                // 映像のみ再取得 (音声はそのまま)
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } })
-                    .then((newStream) => {
-                        const newVideoTrack = newStream.getVideoTracks()[0];
-                        const oldVideoTrack = currentStream.getVideoTracks()[0];
-
-                        // WebRTC接続に乗っている映像トラックを、新しいカメラのものに差し替え
-                        const sender = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video');
-                        if (sender) {
-                            sender.replaceTrack(newVideoTrack).then(() => {
-                                // 古いカメラを停止して解放
-                                oldVideoTrack.stop();
-                                currentStream.removeTrack(oldVideoTrack);
-                                currentStream.addTrack(newVideoTrack);
-                                document.getElementById('my-video').srcObject = currentStream;
-                            }).catch(err => console.error('トラック差し替えエラー:', err));
-                        }
-                    })
-                    .catch(err => console.error('カメラ切り替えアクセスエラー:', err));
-            }
-
-            // 初回のカメラ取得（映像と音声）
             navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true })
                 .then((stream) => {
-                    // IDが取得できたら接続開始
-                    peer.on('open', () => {
-                        connectToViewer(stream);
+                    document.getElementById('my-video').srcObject = stream;
+                    const call = peer.call(targetId, stream, { metadata: { password: targetPw } });
+                    
+                    call.on('error', (err) => {
+                        console.error('接続エラー:', err);
                     });
                 })
                 .catch((err) => {
-                    alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザの権限を確認してください。');
+                    alert('カメラ・マイクのアクセス許可が必要です。設定からブラウザのカメラ権限を確認してください。');
                 });
         }
     </script>
